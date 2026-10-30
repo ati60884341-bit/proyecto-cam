@@ -1,0 +1,12 @@
+pyodbc
+PyQt6
+opencv-python==4.11.0.86
+numpy<2
+pyttsx3
+SpeechRecognition
+pyaudio
+mediapipe==0.10.21
+matplotlib
+onvif-zeep
+requests
+qrcode[pil]
