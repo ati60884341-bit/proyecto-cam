@@ -1,0 +1,201 @@
+# CAM — Sistema Inteligente de Videovigilancia y Auditoria
+
+Software de escritorio (Python + PyQt6, arquitectura **MVC**) con base de datos
+**SQL Server** (triggers de auditoria) para el proyecto "Sistema Inteligente de
+Videovigilancia y Auditoria" (4 zonas: Ingreso, Patio, Estacionamiento, Pasillo).
+
+## Estructura (MVC)
+
+```
+ProyectoCAM/
+  db/                    scripts SQL Server (schema, triggers, seed)
+  app/
+    database/             conexion_bd.py: conexion a SQL Server (pyodbc)
+    models/                Modelo: una clase/archivo por entidad (consultas SQL)
+    views/                 Vista: pantallas PyQt6 (login, dashboard, tablas, etc.)
+      UI/                   frames y dialogos reutilizables (QFrame, QDialog)
+    controllers/           Controlador: logica que conecta vista <-> modelo
+    services/              camara (QThread), sabotaje, voz, panico, fatiga, SHA-256
+    main.py                punto de entrada
+  evidencias/              fotos/videos capturados (se crea solo)
+```
+
+## 1. Base de datos
+
+Requiere SQL Server (local, autenticacion de Windows). Ejecutar en orden:
+
+```bash
+sqlcmd -S localhost -E -C -i db/01_schema.sql
+sqlcmd -S localhost -E -C -i db/02_triggers.sql
+sqlcmd -S localhost -E -C -i db/03_seed.sql
+```
+
+Esto crea la base `bd_cam_seguridad`, el esquema `cam` y **5 triggers**:
+
+| Trigger | Evento | Que hace |
+|---|---|---|
+| `trg_HistorialIncidencias` | AFTER UPDATE en Incidencias | Bitacora de cambios de estado/severidad |
+| `trg_RegistroNuevaIncidencia` | AFTER INSERT en Incidencias | Si es tipo `Panico`, crea la alerta con bloqueo de borrado |
+| `trg_BloqueoBorradoEvidencias` | INSTEAD OF DELETE en Evidencias | Cadena de custodia: bloquea el borrado si hay panico activo en la zona |
+| `trg_EscalamientoSabotajeRepetido` | AFTER INSERT en Incidencias | 3+ sabotajes en 10 min en una zona -> incidencia critica automatica |
+| `trg_CierreTurno` | AFTER UPDATE en Turnos | Al cerrar un turno, calcula y registra su duracion |
+
+Puede probarlos con `db/04_test_triggers.sql`.
+
+## 2. Dependencias de Python
+
+```bash
+pip install -r requirements.txt
+```
+
+Incluye: `pyodbc`, `PyQt6`, `opencv-python`, `pyttsx3`, `SpeechRecognition`,
+`pyaudio`, `mediapipe`, `matplotlib`.
+
+Si `pyaudio` o `mediapipe` no instalan en su equipo, la app sigue funcionando:
+el asistente de voz y la deteccion de gesto se desactivan solos y quedan los
+reemplazos manuales (campo de texto de comandos, boton "Simular Modo Panico").
+
+## 3. Ejecutar
+
+```bash
+python app/main.py
+```
+
+Usuarios de demo (clave para ambos: `123456`):
+
+- `admin` — rol Administrador (puede eliminar evidencias)
+- `vigilante` — rol Vigilante
+
+## 4. Guion de demo sugerido (en vivo ante el jurado)
+
+1. **Login** con `vigilante` / `123456`.
+2. **Centro de monitoreo**: la zona "Ingreso" usa la webcam real (camara 0);
+   las otras 3 son RTSP simuladas (marcan "SIN SENAL", representando
+   Hikvision/Dahua/Tapo del adaptador universal multimarca).
+3. **Abrir turno** en la pestana "Turnos".
+4. **Captura de evidencia**: clic en "Capturar evidencia" en Ingreso -> se
+   guarda una foto, se firma SHA-256 y aparece en "Evidencias".
+5. **Anti-sabotaje**: tapar la camara con la mano 2-3 segundos -> el marco se
+   pone rojo, suena una alerta y se exporta automaticamente un video con los
+   8 segundos previos + una foto del "culpable acercandose" (2s antes del
+   bloqueo), ambos firmados SHA-256. Se crea una incidencia tipo `Sabotaje`.
+6. **Comandos de voz**: activar el checkbox del microfono y decir
+   *"patio ampliar"* o *"ingreso capturar"* (zona + accion, sin palabra de
+   activacion; o usar el campo de texto manual si no hay microfono en la
+   sala). Ver el manual completo de comandos en la seccion 5 de este
+   documento, o con el boton "Ver manual de comandos" del panel derecho.
+7. **Modo panico silencioso**: levantar una mano (o ambas) frente a la camara
+   de Ingreso por 3 segundos — el panel muestra en vivo "mano detectada,
+   sosteniendo X.Xs / 3.0s" (o usar el boton manual). No suena nada; se crea
+   una alerta critica y queda bloqueado el borrado de evidencias de esa zona.
+   Si la camara o la iluminacion no cooperan, use el boton manual.
+7b. **Agregar una camara de cualquier marca**: en la pestana "Camaras",
+   complete zona, nombre, marca (Hikvision/Dahua/Tapo/WebcamUSB/Generico),
+   tipo de conexion (RTSP o USB) y la URL/indice, y pulse "Agregar camara".
+   La camara arranca en caliente y aparece de inmediato en el Centro de
+   Monitoreo (sin reiniciar la app), demostrando el adaptador universal
+   multimarca. Para quitar una, selecciónela en la tabla (el boton "Quitar
+   camara seleccionada" se activa) y confirme: la camara deja de transmitir
+   y desaparece de la lista (puede agregar una nueva para esa zona de
+   inmediato).
+8. **Cadena de custodia**: en "Evidencias", como `admin`, intentar borrar una
+   evidencia de Ingreso mientras el panico esta activo -> el trigger de SQL
+   Server lo rechaza con el mensaje de cadena de custodia.
+9. **Auditor de fatiga**: cada 90 segundos pide confirmacion; si se ignora
+   15 segundos, suena una alerta y se registra la falta.
+10. **Reportes**: graficos de incidencias por tipo y por zona.
+11. **Alertas instantaneas a Telegram (efecto "wow" para el jurado)**: antes
+    de empezar, configure el bot en la pestana "Alertas Telegram" (ver
+    seccion 6) y muestre el QR para que el jurado se una desde su celular.
+    Cuando tape la camara o active el modo panico, la foto + firma SHA-256
+    le llega al instante a su propio telefono.
+
+## 5. Manual de comandos de voz
+
+Formato simple: diga la **zona** y luego la **accion** (en cualquier orden,
+sin palabra de activacion). El campo de texto manual del dashboard acepta
+las mismas frases, sin microfono. Zonas reconocidas: `ingreso`, `patio`,
+`estacionamiento`, `pasillo`, y cualquier zona nueva que haya agregado desde
+la pestana "Camaras". El reconocimiento usa espanol latino (`es-PE`).
+
+**Si no reconoce bien**: el desplegable sobre la casilla de activar microfono
+lista todos los dispositivos de entrada de audio detectados — elija su
+microfono real en vez de "por defecto de Windows" (que puede quedarse
+apuntando a un Bluetooth desconectado). Hable claro, cerca del microfono y
+con el menor ruido de fondo posible. Al activar la casilla, abrir el
+microfono puede tardar hasta 15-20 segundos en algunos equipos (negociacion
+del driver de audio + hilos de camara activos); mientras tanto se muestra
+"Conectando microfono...", es normal — espere a que diga "escuchando".
+
+| Intencion | Frases de ejemplo |
+|---|---|
+| Ver una zona en pantalla completa | "`<zona>` ampliar" / "`<zona>` mostrar" / "`<zona>` pantalla completa" |
+| Capturar evidencia | "`<zona>` capturar" / "`<zona>` foto" / "`<zona>` evidencia" |
+| Acercar (zoom in) | "`<zona>` acercar" / "`<zona>` zoom" |
+| Alejar (zoom out) | "`<zona>` alejar" |
+| Restablecer el zoom | "`<zona>` zoom normal" / "`<zona>` quitar zoom" |
+| Mover la camara (PTZ real) | "`<zona>` mover izquierda / derecha / arriba / abajo" / "`<zona>` girar izquierda" |
+| Vista general | "vista general" (no necesita zona) |
+
+Ejemplos: *"patio ampliar"*, *"ingreso capturar"*, *"estacionamiento acercar"*,
+*"patio mover derecha"*.
+
+**Mover la camara** solo funciona con camaras RTSP de motor Pan/Tilt que
+soporten ONVIF (como la Tapo C510W): usa el mismo usuario/clave de la "Cuenta
+de camara" (RTSP) configurados en la app Tapo, contra el puerto ONVIF 2020.
+Si la camara no tiene motor, o el puerto/credenciales no son correctos, el
+sistema lo informa en la bitacora de eventos sin interrumpir el resto de la
+app.
+
+El zoom es digital (recorta y escala la imagen en vivo), de x1.0 a x3.0 en
+pasos de x0.5, y se aplica tanto al recuadro de la zona como a su vista
+ampliada si esta abierta; la evidencia y la deteccion de sabotaje siempre
+usan la imagen original sin recortar.
+
+El **modo panico silencioso** deliberadamente NO es un comando de voz (para
+no delatar al operador frente a un asaltante): se activa con el gesto de
+mano(s) arriba 3 segundos frente a la camara de Ingreso, o con el boton
+manual "Simular Modo Panico".
+
+## 6. Alertas instantaneas a Telegram
+
+Cuando el sistema detecta un sabotaje o activa el modo panico, puede enviar
+de inmediato la foto de evidencia + su firma SHA-256 a un chat/canal de
+Telegram — ideal para que el jurado reciba la alerta en su propio celular
+durante la demo en vivo, sin tocar nada.
+
+**Paso 1: crear el bot (2 minutos, gratis)**
+1. Abra Telegram y busque el usuario oficial `@BotFather`.
+2. Envie el comando `/newbot`, elija un nombre y un usuario para su bot
+   (debe terminar en "bot", ej. `CentinelaFeriaBot`).
+3. BotFather le entrega un **Token** (una cadena larga tipo
+   `123456789:AAH...`). Guardelo.
+
+**Paso 2: conseguir el Chat ID**
+- Para un chat de prueba: hablele a su bot primero (busquelo por su usuario
+  y envie cualquier mensaje), luego visite en el navegador
+  `https://api.telegram.org/bot<SU_TOKEN>/getUpdates` y busque el campo
+  `"chat":{"id": ...}` en la respuesta — ese numero es el Chat ID.
+- Para un canal/grupo: agregue el bot como administrador del canal/grupo y
+  use el mismo metodo (`getUpdates`) o un bot auxiliar como `@userinfobot`.
+
+**Paso 3: configurar en la app**
+1. Inicie sesion y vaya a la pestana **"Alertas Telegram"**.
+2. Pegue el **Bot Token** y el **Chat ID**, y el usuario del bot (sin `@`).
+3. Pulse **"Guardar configuracion"**, luego **"Enviar mensaje de prueba"**
+   para confirmar que llega.
+4. Pulse **"Generar QR"**: aparece un codigo QR hacia `https://t.me/<su_bot>`
+   — proyectelo o imprimalo para que el jurado lo escanee con la camara de
+   su celular y se una al chat del bot antes de la demo.
+
+A partir de ahi, cada sabotaje detectado o activacion del modo panico envia
+automaticamente la foto + hash SHA-256 a ese chat, sin intervencion manual.
+Si no configura Telegram, el resto de la app funciona exactamente igual (el
+envio simplemente se omite y queda registrado en la bitacora).
+
+## 7. Notas
+
+- Las URLs RTSP de Patio/Estacionamiento/Pasillo en `db/03_seed.sql` son de
+  ejemplo (IPs ficticias). Reemplacelas por las de camaras reales
+  (Hikvision/Dahua/Tapo) en la tabla `cam.Camaras` para que transmitan en vivo.
+- La contrasena de los usuarios de demo es `123456` (SHA-256 almacenado).
