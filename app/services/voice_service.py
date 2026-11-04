@@ -84,8 +84,16 @@ class AsistenteVozThread(QThread):
             self.error_reconocimiento.emit(f"No se encontro microfono disponible: {exc}")
             return
 
-        with microfono as fuente:
-            reconocedor.adjust_for_ambient_noise(fuente, duration=1)
+        try:
+            with microfono as fuente:
+                reconocedor.adjust_for_ambient_noise(fuente, duration=1)
+        except Exception as exc:
+            # sin este try/except, un fallo aqui (ej. el dispositivo elegido
+            # ya no existe, o quedo ocupado por otra app) mataba el hilo en
+            # silencio: el checkbox quedaba marcado pero nunca emitia
+            # "escuchando" ni ningun error, y el usuario no entendia por que
+            self.error_reconocimiento.emit(f"No se pudo preparar el microfono: {exc}")
+            return
 
         while self._activo:
             try:
@@ -94,7 +102,7 @@ class AsistenteVozThread(QThread):
                     audio = reconocedor.listen(fuente, timeout=5, phrase_time_limit=6)
                 self.escuchando.emit(False)
 
-                texto = reconocedor.recognize_google(audio, language="es-ES")
+                texto = reconocedor.recognize_google(audio, language="es-PE")
                 accion, zona, _ = interpretar_comando(texto)
                 self.comando_reconocido.emit(accion, zona, texto)
             except sr.WaitTimeoutError:

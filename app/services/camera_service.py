@@ -234,3 +234,63 @@ class CamaraThread(QThread):
         if self._buffer:
             return self._buffer[-1].copy()
         return None
+
+
+class DeteccionCamarasUSBThread(QThread):
+    """Prueba los indices 0..4 de camara USB/integrada: cual es la webcam
+    depende de cada laptop (la integrada puede caer en el indice 0, 1 o
+    incluso 2 segun el equipo y los drivers), asi que en vez de pedirle al
+    instalador que adivine, se prueban todos y se devuelven los que
+    respondieron con imagen real."""
+
+    resultado = pyqtSignal(list)  # [{"indice": int, "resolucion": "WxH"}, ...]
+
+    def run(self):
+        encontradas = []
+        for indice in range(5):
+            cap = cv2.VideoCapture(indice, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                ok, frame = cap.read()
+                if ok and frame is not None:
+                    alto, ancho = frame.shape[:2]
+                    encontradas.append({"indice": indice, "resolucion": f"{ancho}x{alto}"})
+            cap.release()
+        self.resultado.emit(encontradas)
+
+
+class PruebaConexionThread(QThread):
+    """Prueba de conectividad para la pestana Camaras (ej. al dar de alta un
+    canal del DVR Hikvision in situ): abre la captura y espera un fotograma
+    real, no solo isOpened() (que en RTSP a veces da "abierto" igual aunque
+    el stream nunca entregue nada). Corre en su propio hilo para no congelar
+    la UI mientras FFmpeg intenta conectar."""
+
+    resultado = pyqtSignal(bool, str)
+
+    def __init__(self, tipo_conexion, url_conexion, parent=None):
+        super().__init__(parent)
+        self.tipo_conexion = tipo_conexion
+        self.url_conexion = url_conexion
+
+    def run(self):
+        captura = _abrir_captura_sin_bloqueo(self.tipo_conexion, self.url_conexion)
+        if not captura or not captura.isOpened():
+            self.resultado.emit(
+                False,
+                "No se pudo conectar. Revise IP, puerto, usuario/clave, el numero "
+                "de canal, y que esta PC este en la misma red que la camara/DVR.",
+            )
+            return
+        try:
+            for _ in range(15):  # hasta ~1.5s: algunas camaras tardan el primer fotograma
+                ok, frame = captura.read()
+                if ok and frame is not None:
+                    alto, ancho = frame.shape[:2]
+                    self.resultado.emit(True, f"Conexion exitosa: se recibio una imagen de {ancho}x{alto}.")
+                    return
+                self.msleep(100)
+            self.resultado.emit(
+                False, "Conecto pero no llego ninguna imagen. Revise el numero de canal o el tipo de stream.",
+            )
+        finally:
+            captura.release()

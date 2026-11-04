@@ -82,6 +82,14 @@ class MonitoreoController:
     PASO_ARRANQUE_SEG = 0.8
     PASO_ARRANQUE_PANICO_SEG = 2.5
 
+    def encolar_arranque_nativo(self, funcion, paso_seg=None):
+        """Punto de entrada publico para OTROS controladores (ej.
+        CamaraController, al probar una conexion o detectar camaras USB
+        desde la pestana "Camaras"): usan la misma cola de abajo para que
+        esos intentos nunca abran FFmpeg/OpenCV al mismo tiempo que una
+        camara del Centro de Monitoreo esta arrancando o reconectando."""
+        self._programar_arranque_nativo(funcion, paso_seg=paso_seg)
+
     def _programar_arranque_nativo(self, funcion, paso_seg=None):
         """Serializa el arranque de hilos que inicializan librerias nativas
         pesadas (FFmpeg por camara, mediapipe): nunca se inician dos a la

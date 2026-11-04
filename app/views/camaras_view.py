@@ -7,6 +7,27 @@ from PyQt6.QtWidgets import (
 MARCAS = ["Hikvision", "Dahua", "Tapo", "WebcamUSB", "Generico"]
 COLUMNAS = ["ID", "Zona", "Nombre", "Marca", "Conexion", "URL / Indice", "Estado"]
 
+# Marcas de DVR/NVR cuya URL RTSP se puede armar sola a partir de
+# IP + usuario + clave + canal, para que quien instala en el local no tenga
+# que escribir ni recordar el formato exacto de la URL.
+MARCAS_CON_ASISTENTE_DVR = ("Hikvision", "Dahua")
+
+
+def _construir_url_dvr(marca, ip, puerto, usuario, clave, canal, flujo_principal):
+    if not ip:
+        return ""
+    puerto = puerto or "554"
+    canal = canal or "1"
+    usuario = usuario or "admin"
+    if marca == "Hikvision":
+        # canal 1 principal -> 101, canal 1 secundario -> 102, canal 2 -> 201/202, etc.
+        sub = "01" if flujo_principal else "02"
+        return f"rtsp://{usuario}:{clave}@{ip}:{puerto}/Streaming/Channels/{canal}{sub}"
+    if marca == "Dahua":
+        subtype = "0" if flujo_principal else "1"
+        return f"rtsp://{usuario}:{clave}@{ip}:{puerto}/cam/realmonitor?channel={canal}&subtype={subtype}"
+    return ""
+
 
 class CamarasView(QWidget):
     """Alta de camaras (adaptador universal multimarca): cualquier camara IP
@@ -15,6 +36,8 @@ class CamarasView(QWidget):
     agregar_solicitado = pyqtSignal(dict)
     quitar_solicitado = pyqtSignal(int)
     refrescar_solicitado = pyqtSignal()
+    probar_solicitado = pyqtSignal(dict)
+    detectar_usb_solicitado = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -35,20 +58,78 @@ class CamarasView(QWidget):
 
         self.campo_marca = QComboBox()
         self.campo_marca.addItems(MARCAS)
+        self.campo_marca.currentTextChanged.connect(self._actualizar_asistente_dvr)
         formulario.addRow("Marca:", self.campo_marca)
 
         self.campo_tipo = QComboBox()
         self.campo_tipo.addItems(["RTSP", "USB"])
         self.campo_tipo.currentTextChanged.connect(self._actualizar_placeholder_url)
+        self.campo_tipo.currentTextChanged.connect(self._actualizar_asistente_dvr)
         formulario.addRow("Conexion:", self.campo_tipo)
+
+        # Asistente Hikvision/Dahua: completando esto, la URL de abajo se
+        # arma sola (nadie tiene que memorizar el formato RTSP del DVR).
+        self.grupo_asistente = QGroupBox("Asistente de conexion al DVR (completa esto y la URL se arma sola)")
+        formulario_asistente = QFormLayout(self.grupo_asistente)
+
+        self.campo_ip = QLineEdit()
+        self.campo_ip.setPlaceholderText("Ej: 192.168.1.64")
+        formulario_asistente.addRow("IP del DVR/camara:", self.campo_ip)
+
+        self.campo_puerto = QLineEdit("554")
+        formulario_asistente.addRow("Puerto RTSP:", self.campo_puerto)
+
+        self.campo_usuario_dvr = QLineEdit("admin")
+        formulario_asistente.addRow("Usuario:", self.campo_usuario_dvr)
+
+        self.campo_clave_dvr = QLineEdit()
+        self.campo_clave_dvr.setEchoMode(QLineEdit.EchoMode.Password)
+        formulario_asistente.addRow("Clave:", self.campo_clave_dvr)
+
+        self.campo_canal = QLineEdit("1")
+        formulario_asistente.addRow("Canal (1, 2, 3...):", self.campo_canal)
+
+        self.campo_flujo = QComboBox()
+        self.campo_flujo.addItems(["Principal (mejor calidad)", "Secundario (mas liviano)"])
+        formulario_asistente.addRow("Calidad de video:", self.campo_flujo)
+
+        for campo in (self.campo_ip, self.campo_puerto, self.campo_usuario_dvr, self.campo_clave_dvr, self.campo_canal):
+            campo.textChanged.connect(self._actualizar_url_desde_asistente)
+        self.campo_flujo.currentIndexChanged.connect(self._actualizar_url_desde_asistente)
+
+        formulario.addRow(self.grupo_asistente)
 
         self.campo_url = QLineEdit()
         formulario.addRow("URL RTSP / indice USB:", self.campo_url)
-        self._actualizar_placeholder_url("RTSP")
 
+        # Deteccion de camaras USB: el indice de la webcam cambia de laptop a
+        # laptop (la integrada puede ser 0, 1 o 2 segun el equipo), asi que
+        # en vez de adivinar se prueban todas y se eligen de una lista.
+        fila_usb = QHBoxLayout()
+        self.btn_detectar_usb = QPushButton("Detectar camaras USB disponibles")
+        self.btn_detectar_usb.clicked.connect(self._emitir_detectar_usb)
+        fila_usb.addWidget(self.btn_detectar_usb)
+
+        self.combo_usb_detectadas = QComboBox()
+        self.combo_usb_detectadas.setPlaceholderText("(pulse Detectar)")
+        self.combo_usb_detectadas.currentIndexChanged.connect(self._elegir_usb_detectada)
+        fila_usb.addWidget(self.combo_usb_detectadas)
+        self.fila_usb_widget = QWidget()
+        self.fila_usb_widget.setLayout(fila_usb)
+        formulario.addRow(self.fila_usb_widget)
+
+        self._actualizar_placeholder_url("RTSP")
+        self._actualizar_asistente_dvr()
+
+        fila_botones = QHBoxLayout()
         self.btn_agregar = QPushButton("Agregar camara")
         self.btn_agregar.clicked.connect(self._emitir_agregar)
-        formulario.addRow(self.btn_agregar)
+        fila_botones.addWidget(self.btn_agregar)
+
+        self.btn_probar = QPushButton("Probar conexion")
+        self.btn_probar.clicked.connect(self._emitir_probar)
+        fila_botones.addWidget(self.btn_probar)
+        formulario.addRow(fila_botones)
 
         layout.addWidget(grupo)
 
@@ -81,10 +162,72 @@ class CamarasView(QWidget):
         layout.addWidget(self.tabla)
 
     def _actualizar_placeholder_url(self, tipo):
+        self.fila_usb_widget.setVisible(tipo == "USB")
         if tipo == "USB":
             self.campo_url.setPlaceholderText("0  (indice de la webcam, normalmente 0)")
         else:
             self.campo_url.setPlaceholderText("rtsp://usuario:clave@192.168.1.50:554/stream1")
+
+    def _emitir_detectar_usb(self):
+        self.detectar_usb_solicitado.emit()
+
+    def set_detectando_usb(self, activo):
+        self.btn_detectar_usb.setEnabled(not activo)
+        self.btn_detectar_usb.setText("Detectando..." if activo else "Detectar camaras USB disponibles")
+
+    def mostrar_camaras_usb_detectadas(self, encontradas):
+        self.combo_usb_detectadas.clear()
+        if not encontradas:
+            self.combo_usb_detectadas.addItem("Ninguna camara respondio", None)
+            QMessageBox.warning(
+                self, "Deteccion de camaras USB",
+                "No se encontro ninguna camara USB/integrada en los indices 0 a 4. "
+                "Verifique que este conectada y que ninguna otra app (Zoom, Teams, etc.) la este usando.",
+            )
+            return
+        for c in encontradas:
+            self.combo_usb_detectadas.addItem(f"Indice {c['indice']} ({c['resolucion']})", c["indice"])
+
+    def _elegir_usb_detectada(self, _posicion):
+        indice = self.combo_usb_detectadas.currentData()
+        if indice is not None:
+            self.campo_url.setText(str(indice))
+
+    def _actualizar_asistente_dvr(self):
+        mostrar = (
+            self.campo_marca.currentText() in MARCAS_CON_ASISTENTE_DVR
+            and self.campo_tipo.currentText() == "RTSP"
+        )
+        self.grupo_asistente.setVisible(mostrar)
+        if mostrar:
+            self._actualizar_url_desde_asistente()
+
+    def _actualizar_url_desde_asistente(self):
+        if not self.grupo_asistente.isVisible():
+            return
+        url = _construir_url_dvr(
+            self.campo_marca.currentText(),
+            self.campo_ip.text().strip(),
+            self.campo_puerto.text().strip(),
+            self.campo_usuario_dvr.text().strip(),
+            self.campo_clave_dvr.text(),
+            self.campo_canal.text().strip(),
+            self.campo_flujo.currentIndex() == 0,
+        )
+        if url:
+            self.campo_url.setText(url)
+
+    def _emitir_probar(self):
+        tipo = self.campo_tipo.currentText()
+        url = self.campo_url.text().strip()
+        if not url:
+            QMessageBox.warning(self, "Falta la URL", "Complete la URL RTSP (o el indice USB) antes de probar.")
+            return
+        self.probar_solicitado.emit({"tipo_conexion": tipo, "url": url})
+
+    def set_probando(self, activo):
+        self.btn_probar.setEnabled(not activo)
+        self.btn_probar.setText("Probando..." if activo else "Probar conexion")
 
     def _emitir_agregar(self):
         zona = self.campo_zona.currentText().strip()

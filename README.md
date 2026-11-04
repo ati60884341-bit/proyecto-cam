@@ -42,6 +42,9 @@ Esto crea la base `bd_cam_seguridad`, el esquema `cam` y **5 triggers**:
 
 Puede probarlos con `db/04_test_triggers.sql`.
 
+Si otras laptops van a conectarse a esta base por red (no desde esta misma
+PC), vea `db/05_acceso_red.sql` y la seccion 7 de este documento.
+
 ## 2. Dependencias de Python
 
 ```bash
@@ -98,6 +101,22 @@ Usuarios de demo (clave para ambos: `123456`):
    camara seleccionada" se activa) y confirme: la camara deja de transmitir
    y desaparece de la lista (puede agregar una nueva para esa zona de
    inmediato).
+
+   **Conectar un DVR/NVR Hikvision o Dahua:** al elegir esa marca con
+   conexion RTSP aparece un "Asistente de conexion al DVR" (IP, puerto,
+   usuario, clave, canal y calidad) que arma la URL RTSP solo — no hace
+   falta escribirla ni saber su formato. Antes de agregarla, use **"Probar
+   conexion"**: intenta abrir el canal y avisa si conecto o que falla (red,
+   credenciales, numero de canal), sin tener que ir al Centro de Monitoreo
+   ni abrir VLC. El DVR debe estar en la misma red (WiFi o UTP al mismo
+   router/switch) que esta PC, con el servicio RTSP habilitado en su
+   configuracion de red (puerto por defecto `554`).
+
+   **Camaras USB/integradas en otra laptop:** el indice de la webcam no es
+   siempre 0 (varia segun el equipo). Con conexion "USB" seleccionada,
+   pulse **"Detectar camaras USB disponibles"**: prueba los indices 0 a 4
+   y los lista con su resolucion para elegir el correcto, sin tener que
+   adivinar ni probar uno por uno.
 8. **Cadena de custodia**: en "Evidencias", como `admin`, intentar borrar una
    evidencia de Ingreso mientras el panico esta activo -> el trigger de SQL
    Server lo rechaza con el mensaje de cadena de custodia.
@@ -193,7 +212,72 @@ automaticamente la foto + hash SHA-256 a ese chat, sin intervencion manual.
 Si no configura Telegram, el resto de la app funciona exactamente igual (el
 envio simplemente se omite y queda registrado en la bitacora).
 
-## 7. Notas
+## 7. Generar el instalador (.exe) para llevar el programa a otra PC
+
+Para no depender de instalar Python ni las librerias en cada laptop, el
+programa se empaqueta con **PyInstaller** y se distribuye como instalador
+con **Inno Setup**.
+
+**Paso 1: generar la carpeta del programa**
+
+```bash
+venv\Scripts\pip install pyinstaller
+venv\Scripts\pyinstaller.exe CAM.spec
+```
+
+Esto crea `dist\ProyectoCAM\` (unos 400 MB: incluye PyQt6, OpenCV, mediapipe
+y el resto de dependencias). Pruebe que arranca con
+`dist\ProyectoCAM\ProyectoCAM.exe` antes de seguir.
+
+**Paso 2: armar el instalador**
+
+1. Instale [Inno Setup](https://jrsoftware.org/isdl.php) (gratis) en esta PC
+   de desarrollo (no en la PC destino).
+2. Abra `installer.iss` con Inno Setup y pulse "Compile" (o
+   `iscc installer.iss` por linea de comandos). Genera
+   `installer_output\ProyectoCAM_Setup.exe`.
+3. Ese `ProyectoCAM_Setup.exe` es el unico archivo que se lleva a la otra
+   PC/laptop: lo ejecuta, elige una carpeta (por defecto no pide ser
+   administrador) y queda listo con acceso directo en el escritorio.
+
+**Lo que la PC destino necesita tener instalado aparte** (no viaja dentro
+del `.exe` porque son componentes del sistema, no paquetes de Python):
+
+- **ODBC Driver 18 for SQL Server** (lo usa `pyodbc` para hablar con SQL
+  Server) — <https://go.microsoft.com/fwlink/?linkid=2278537>.
+- **Visual C++ Redistributable x64** (lo usan OpenCV/mediapipe) —
+  <https://aka.ms/vs/17/release/vc_redist.x64.exe>. La mayoria de PCs con
+  Windows 10/11 actualizado ya lo tiene.
+
+`installer.iss` tiene comentada la seccion para que el propio instalador
+descargue/instale esos dos automaticamente (descomentarla una vez que
+tenga los `.exe`/`.msi` oficiales guardados en una carpeta `prereqs\`).
+
+**Base de datos:** el instalador NO incluye SQL Server. Lo recomendado es
+tener **un solo** SQL Server central (puede ser SQL Server Express, gratis)
+en una PC del local, y que las demas laptops solo lleven el `.exe`
+conectandose por red. Por defecto la app usa autenticacion de Windows
+(`Trusted_Connection`, solo sirve si la app corre en la misma PC que el SQL
+Server, o en el mismo dominio). Para conectarse desde otra laptop por red,
+corra una vez `db/05_acceso_red.sql` en el servidor (trae los pasos previos
+que hay que hacer a mano: habilitar autenticacion mixta en el SQL Server y
+el puerto 1433 en el Firewall) y defina estas variables de entorno en cada
+laptop antes de abrir `ProyectoCAM.exe`:
+
+```bash
+set CAM_DB_SERVER=192.168.1.X
+set CAM_DB_NAME=bd_cam_seguridad
+set CAM_DB_USER=cam_app
+set CAM_DB_PASSWORD=la_clave_que_puso_en_05_acceso_red.sql
+```
+
+**Actualizaciones:** el `.exe` es una foto fija del codigo al momento de
+compilarlo. Cada cambio en `app/` requiere repetir el Paso 1 y el Paso 2 y
+reinstalar en cada laptop; los cambios de esquema de base de datos (carpeta
+`db/`) se corren aparte, una sola vez contra el SQL Server central, sin
+tocar el `.exe`.
+
+## 8. Notas
 
 - Las URLs RTSP de Patio/Estacionamiento/Pasillo en `db/03_seed.sql` son de
   ejemplo (IPs ficticias). Reemplacelas por las de camaras reales

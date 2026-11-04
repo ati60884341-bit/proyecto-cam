@@ -32,6 +32,7 @@ class AppController:
             self.main_window.camaras_view, usuario,
             on_camara_agregada=self.monitoreo_controller.agregar_camara,
             on_camara_quitada=self.monitoreo_controller.quitar_camara,
+            programar_arranque_nativo=self.monitoreo_controller.encolar_arranque_nativo,
         )
         self.telegram_controller = TelegramController(self.main_window.telegram_view)
 

@@ -4,3 +4,7 @@ __pycache__/
 *.log
 evidencias/
 telegram_config.json
+build/
+dist/
+build_log.txt
+installer_output/
