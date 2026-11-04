@@ -208,14 +208,22 @@ class MonitoreoController:
         )
 
     def quitar_camara(self, zona):
-        """Detiene y retira la camara de una zona (no se puede capturar,
-        ampliar, hacer zoom ni mover mientras no se agregue otra)."""
+        """Detiene la camara y borra la zona por completo del Centro de
+        Monitoreo: no debe quedar rastro (ni el recuadro, ni la vista
+        ampliada si estaba abierta) hasta que se agregue una camara nueva."""
         hilo = self.hilos_camara.pop(zona, None)
         if hilo:
             hilo.detener()
             hilo.wait(1500)
         self.camaras_por_zona.pop(zona, None)
-        self.view.marcar_zona_removida(zona)
+        self.factor_zoom.pop(zona, None)
+
+        dialogo = self.dialogos_ampliados.pop(zona, None)
+        if dialogo:
+            dialogo.close()
+            dialogo.deleteLater()
+
+        self.view.quitar_zona_frame(zona)
         self._actualizar_manual_ptz()
         self.view.registrar_evento(f"[CAMARA] Camara de {zona} quitada por el administrador.")
 

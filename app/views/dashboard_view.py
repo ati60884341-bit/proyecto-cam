@@ -245,10 +245,16 @@ class DashboardView(QWidget):
             return existente
         return self._agregar_tile(camara)
 
-    def marcar_zona_removida(self, zona):
-        tile = self.zona_frames.get(zona)
+    def quitar_zona_frame(self, zona):
+        """Borra el recuadro de la zona por completo del Centro de
+        Monitoreo (no lo deja marcado como "CAMARA QUITADA"): al volver a
+        agregar una camara a esa misma zona, _agregar_tile() crea un
+        recuadro nuevo, como si nunca hubiera habido nada ahi."""
+        tile = self.zona_frames.pop(zona, None)
         if tile:
-            tile.actualizar_estado("removida")
+            self.grid.removeWidget(tile)
+            tile.setParent(None)
+            tile.deleteLater()
 
     def _emitir_comando_manual(self):
         texto = self.campo_comando.text().strip()

@@ -215,11 +215,22 @@ class CamarasView(QWidget):
         if url:
             self.campo_url.setText(url)
 
+    def _url_tiene_credenciales_de_ejemplo(self, url):
+        return "rtsp://usuario:clave@" in url
+
     def _emitir_probar(self):
         tipo = self.campo_tipo.currentText()
         url = self.campo_url.text().strip()
         if not url:
             QMessageBox.warning(self, "Falta la URL", "Complete la URL RTSP (o el indice USB) antes de probar.")
+            return
+        if tipo == "RTSP" and self._url_tiene_credenciales_de_ejemplo(url):
+            QMessageBox.warning(
+                self, "Falta completar usuario y clave",
+                "La URL todavia tiene \"usuario:clave\" de ejemplo - reemplacelos por el "
+                "usuario y la clave reales de la camara antes de probar (si no, va a fallar "
+                "con error 401 Unauthorized).",
+            )
             return
         self.probar_solicitado.emit({"tipo_conexion": tipo, "url": url})
 
@@ -227,12 +238,44 @@ class CamarasView(QWidget):
         self.btn_probar.setEnabled(not activo)
         self.btn_probar.setText("Probando..." if activo else "Probar conexion")
 
+    def prellenar_desde_radar(self, info):
+        """Llamado desde el "Radar de camaras" al elegir "Usar en Camaras"
+        para un hallazgo: completa lo que ya se sabe de verdad (marca, IP).
+        Si el usuario ya escribio usuario/clave en el Radar (ej. para el
+        "Reintentar con estas credenciales"), se usan aca tambien - si no,
+        se deja un "usuario:clave" de ejemplo bien visible para que no
+        pase desapercibido y la pruebe sin completar (eso daba 401
+        Unauthorized sin aviso claro de por que)."""
+        marca = info.get("marca_app", "Generico")
+        if marca in MARCAS:
+            self.campo_marca.setCurrentText(marca)
+        self.campo_tipo.setCurrentText("RTSP")
+        usuario = info.get("usuario") or ""
+        clave = info.get("clave") or ""
+        if marca in MARCAS_CON_ASISTENTE_DVR:
+            self.campo_ip.setText(info.get("ip", ""))
+            if usuario:
+                self.campo_usuario_dvr.setText(usuario)
+            if clave:
+                self.campo_clave_dvr.setText(clave)
+        else:
+            self.campo_url.setText(f"rtsp://{usuario or 'usuario'}:{clave or 'clave'}@{info.get('ip', '')}:554/")
+        self.campo_nombre.setFocus()
+
     def _emitir_agregar(self):
         zona = self.campo_zona.currentText().strip()
         nombre = self.campo_nombre.text().strip()
         url = self.campo_url.text().strip()
         if not zona or not nombre or not url:
             QMessageBox.warning(self, "Faltan datos", "Complete zona, nombre y URL/indice de la camara.")
+            return
+        if self.campo_tipo.currentText() == "RTSP" and self._url_tiene_credenciales_de_ejemplo(url):
+            QMessageBox.warning(
+                self, "Falta completar usuario y clave",
+                "La URL todavia tiene \"usuario:clave\" de ejemplo - reemplacelos por el "
+                "usuario y la clave reales de la camara antes de agregarla (si no, va a fallar "
+                "con error 401 Unauthorized).",
+            )
             return
         self.agregar_solicitado.emit({
             "zona": zona,

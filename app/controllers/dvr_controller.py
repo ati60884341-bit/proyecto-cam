@@ -65,8 +65,22 @@ class DvrController:
         if not dispositivo:
             return
         canales_existentes = dispositivo_dvr_model.canales_registrados(id_dispositivo)
-        self.view.registrar_evento(f"[{dispositivo['Nombre']}] Buscando canales nuevos...")
-        self._iniciar_deteccion(id_dispositivo, dispositivo, canales_a_omitir=canales_existentes)
+        # dispositivo_dvr_model.obtener() devuelve las columnas de la BD tal
+        # cual (Marca, IP, Puerto...), pero _iniciar_deteccion/_ejecutar_deteccion
+        # esperan el mismo dict en minuscula que arma DvrView al registrar
+        # (marca, ip, puerto...) - sin normalizar esto, el boton "Detectar
+        # canales nuevos" tronaba con KeyError apenas se usaba
+        datos = {
+            "nombre": dispositivo["Nombre"],
+            "marca": dispositivo["Marca"],
+            "ip": dispositivo["IP"],
+            "puerto": dispositivo["Puerto"],
+            "usuario": dispositivo["Usuario"],
+            "clave": dispositivo["Clave"],
+            "cantidad_canales": dispositivo["CantidadCanales"],
+        }
+        self.view.registrar_evento(f"[{datos['nombre']}] Buscando canales nuevos...")
+        self._iniciar_deteccion(id_dispositivo, datos, canales_a_omitir=canales_existentes)
 
     def _iniciar_deteccion(self, id_dispositivo, datos, canales_a_omitir):
         self.view.set_detectando(True, total=datos["cantidad_canales"])

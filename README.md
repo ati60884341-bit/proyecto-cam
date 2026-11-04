@@ -45,7 +45,18 @@ Puede probarlos con `db/04_test_triggers.sql`.
 Para la pestana "NVR / DVR" (alta masiva de canales, ver seccion 4) corra
 tambien `db/06_dispositivos_dvr.sql` una vez (agrega la tabla
 `cam.DispositivosDVR` y dos columnas en `cam.Camaras`, no borra nada de lo
-existente).
+existente), y `db/07_capacidades_camara.sql` (agrega la columna `TienePTZ`).
+
+Si ya probo la app con los datos de ejemplo de `03_seed.sql` (zonas
+Ingreso/Patio/Estacionamiento/Pasillo con camaras simuladas) y ahora va a
+trabajar con camaras reales, corra `db/08_zonas_ejemplo.sql` y despues
+`db/09_reactivar_webcam_pc.sql`: desactivan las 3 camaras RTSP de muestra
+(IPs inventadas, sin borrarlas) y renombran sus zonas a "Zona de prueba
+1-4" para que no choquen con los nombres reales que usted escriba despues,
+agregan varias zonas genericas mas (Recepcion, Almacen, Oficina principal,
+etc.), y dejan **activa** la webcam USB real de la PC ("Cam-Ingreso-01",
+indice 0) — esa si funciona de verdad (deteccion de gesto/panico y
+sabotaje la usan), no es una camara simulada como las otras 3.
 
 Si otras laptops van a conectarse a esta base por red (no desde esta misma
 PC), vea `db/05_acceso_red.sql` y la seccion 7 de este documento.
@@ -104,8 +115,10 @@ Usuarios de demo (clave para ambos: `123456`):
    Monitoreo (sin reiniciar la app), demostrando el adaptador universal
    multimarca. Para quitar una, selecciónela en la tabla (el boton "Quitar
    camara seleccionada" se activa) y confirme: la camara deja de transmitir
-   y desaparece de la lista (puede agregar una nueva para esa zona de
-   inmediato).
+   y su recuadro **desaparece por completo** del Centro de Monitoreo (no
+   queda ningun rastro, ni placeholder de "camara quitada") y de la lista
+   de "Camaras" (puede agregar una nueva para esa zona de inmediato, que
+   arma un recuadro nuevo desde cero).
 
    **Conectar un DVR/NVR Hikvision o Dahua:** al elegir esa marca con
    conexion RTSP aparece un "Asistente de conexion al DVR" (IP, puerto,
@@ -343,7 +356,51 @@ reinstalar en cada laptop; los cambios de esquema de base de datos (carpeta
 `db/`) se corren aparte, una sola vez contra el SQL Server central, sin
 tocar el `.exe`.
 
-## 8. Notas
+## 8. Radar de camaras (deteccion automatica en la red)
+
+La pestana **"Radar de camaras"** busca equipos encendidos en la misma red
+sin que haga falta saber su IP de antemano — el mismo mecanismo que usan
+las herramientas propias de cada fabricante (SADP de Hikvision, ConfigTool
+de Dahua): no agrega ninguna dependencia nueva, usa `onvif-zeep` (ya
+incluido) mas la libreria estandar de Python.
+
+**Como funciona:**
+1. **WS-Discovery** (el estandar ONVIF de "busqueda" en la red): manda una
+   sonda por multicast UDP y escucha durante unos segundos. Cualquier
+   camara/grabador con ONVIF habilitado responde con su IP.
+2. Por cada IP que respondio, se consulta ONVIF directo al equipo
+   (`GetDeviceInformation`): la **marca y el modelo son reales** — el
+   propio dispositivo se identifica, no es una adivinanza.
+3. Se cuentan las fuentes de video del equipo (`GetVideoSources`): 1 sola
+   → se estima "camara individual"; mas de 1 → se estima "grabador
+   DVR/NVR" con esa cantidad de canales.
+4. Con la casilla **"Escaneo completo"** marcada, ademas se revisan las 254
+   direcciones de la red por el puerto 554 (RTSP) — mas lento (hasta un
+   minuto) pero encuentra equipos con ONVIF apagado; estos quedan con
+   marca/modelo "Desconocidos" salvo que un reintento de ONVIF directo si
+   funcione.
+
+**Algunas marcas piden usuario/clave hasta para identificarse**: a
+diferencia de Hikvision/Dahua (que suelen responder `GetDeviceInformation`
+sin credenciales), las camaras Tapo exigen autenticacion ONVIF incluso para
+esa consulta de solo lectura — sin eso, el radar las encuentra (responden
+en el puerto 554 o 2020) pero quedan como "Desconocida". Por eso la
+pestana tiene campos opcionales de **usuario/clave** (use la "Cuenta de
+camara" de esa marca, no la de la app del celular) que se usan en todo el
+escaneo, y un boton **"Reintentar con estas credenciales"** por fila: vuelve
+a consultar solo ese equipo con lo que haya en esos campos, sin repetir
+todo el escaneo — util cuando un hallazgo quedo "Desconocida" por pedir
+autenticacion.
+
+**Importante — esto es deteccion "de buena fe", no infalible**: la marca y
+el modelo vienen del propio equipo (confiables), pero "camara suelta" vs
+"grabador" es una ESTIMACION por cantidad de canales, no una garantia en
+todas las marcas/firmwares. Al seleccionar un hallazgo y pulsar **"Usar en
+Camaras"** o **"Usar en NVR / DVR"**, el programa cambia de pestana con la
+IP y la marca ya precargadas — pero el usuario/clave y el nombre los
+confirma el usuario; el radar nunca inventa ni guarda credenciales.
+
+## 9. Notas
 
 - Las URLs RTSP de Patio/Estacionamiento/Pasillo en `db/03_seed.sql` son de
   ejemplo (IPs ficticias). Reemplacelas por las de camaras reales

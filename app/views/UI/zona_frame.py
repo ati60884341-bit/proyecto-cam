@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayou
 ESTILO_NORMAL = "QFrame#zonaFrame { border: 3px solid #3a3f44; border-radius: 6px; background: #111; }"
 ESTILO_SABOTAJE = "QFrame#zonaFrame { border: 3px solid #e53935; border-radius: 6px; background: #220000; }"
 ESTILO_SIN_SENAL = "QFrame#zonaFrame { border: 3px solid #555; border-radius: 6px; background: #1a1a1a; }"
-ESTILO_REMOVIDA = "QFrame#zonaFrame { border: 3px dashed #444; border-radius: 6px; background: #0a0a0a; }"
 
 
 def frame_a_pixmap(frame_bgr, ancho_destino, alto_destino):
@@ -80,11 +79,14 @@ class ZonaFrame(QFrame):
             self.setStyleSheet(ESTILO_SABOTAJE)
             self.estado_label.setText("ALERTA: posible sabotaje / camara tapada")
             self._set_botones_habilitados(True)
-        elif estado == "removida":
-            self.setStyleSheet(ESTILO_REMOVIDA)
-            self.video_label.setText("CAMARA QUITADA\n(agregue una nueva desde \"Camaras\")")
-            self.estado_label.setText("Estado: desconectada por el administrador")
-            self._set_botones_habilitados(False)
+        elif estado == "reconectando":
+            # resincronizacion INTENCIONAL (tras un PTZ, o preventiva cada
+            # par de minutos), no una desconexion real: a proposito NO se
+            # toca el video (sigue el ultimo fotograma en pantalla, no el
+            # aviso "SIN SENAL") para no interrumpir la vista justo cuando
+            # mas se nota, como al mover la camara por voz en una demo
+            self.estado_label.setText("Estado: resincronizando video...")
+            self._set_botones_habilitados(True)
         else:
             self.setStyleSheet(ESTILO_SIN_SENAL)
             self.video_label.setText("SIN SENAL\n(camara simulada / no disponible)")

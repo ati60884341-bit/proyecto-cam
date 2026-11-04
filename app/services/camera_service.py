@@ -96,7 +96,7 @@ class CamaraThread(QThread):
     y buffer RAM de los ultimos BUFFER_SEGUNDOS ("maquina del tiempo")."""
 
     frame_listo = pyqtSignal(object)          # numpy array BGR, para pintar en la UI
-    estado_cambiado = pyqtSignal(str)         # "conectada" | "sin_senal" | "sabotaje"
+    estado_cambiado = pyqtSignal(str)         # "conectada" | "sin_senal" | "sabotaje" | "reconectando"
     sabotaje_detectado = pyqtSignal(str, str, str)  # zona, ruta_video, ruta_foto
 
     def __init__(self, id_camara, zona, nombre_camara, tipo_conexion, url_conexion, parent=None):
@@ -184,13 +184,27 @@ class CamaraThread(QThread):
             self._forzar_reconexion = False  # descarta pedidos de reconexion viejos, ya se reconecto
 
             self.estado_cambiado.emit("conectada")
-            if not self._transmitir(captura):
+            razon = self._transmitir(captura)
+            if razon == "fallo":
+                # esto si es una desconexion real (la camara dejo de responder)
                 self.estado_cambiado.emit("sin_senal")
+            elif razon == "resync":
+                # resincronizacion PEDIDA (tras un PTZ, o preventiva cada
+                # RESINCRONIZACION_PERIODICA_SEG), no un error: antes esto
+                # tambien emitia "sin_senal" y la zona mostraba el aviso de
+                # "SIN SENAL" durante toda la reconexion (1-4s) - justo
+                # despues de mover la camara por voz, que es cuando mas se
+                # nota. Con "reconectando" la vista deja el ultimo fotograma
+                # quieto en pantalla (no lo borra) en vez de taparlo con el
+                # aviso de error, mientras se reconecta en segundo plano.
+                self.estado_cambiado.emit("reconectando")
             captura.release()
 
     def _transmitir(self, captura):
         """Lee y procesa frames hasta que se pida detener o la transmision se
-        degrade de forma sostenida. Devuelve False cuando hay que reconectar."""
+        degrade. Devuelve "fallo" (desconexion real: hay que avisar "sin
+        senal"), "resync" (reconexion pedida o preventiva: no es un error,
+        no hay que avisar nada) o "detenido" (se esta apagando la app)."""
         intervalo = 1.0 / CAPTURA_FPS
         fallos_seguidos = 0
         ultimo_procesado = 0.0
@@ -207,17 +221,17 @@ class CamaraThread(QThread):
             if not ok or frame is None:
                 fallos_seguidos += 1
                 if fallos_seguidos > LECTURAS_FALLIDAS_PARA_RECONECTAR:
-                    return False  # la captura esta degradada: se reabre de cero
+                    return "fallo"  # la captura esta degradada: se reabre de cero
                 self.msleep(50)
                 continue
             fallos_seguidos = 0
 
             if self._forzar_reconexion:
                 self._forzar_reconexion = False
-                return False  # resincronizacion pedida desde afuera (ej. tras un PTZ)
+                return "resync"  # resincronizacion pedida desde afuera (ej. tras un PTZ)
 
             if es_rtsp and (time.time() - inicio_transmision) > RESINCRONIZACION_PERIODICA_SEG:
-                return False  # reconexion preventiva: pide un I-frame nuevo
+                return "resync"  # reconexion preventiva: pide un I-frame nuevo
 
             ahora = time.time()
             if ahora - ultimo_procesado < intervalo:
@@ -228,7 +242,7 @@ class CamaraThread(QThread):
             self.frame_listo.emit(frame)
             self._actualizar_sabotaje(frame)
 
-        return True
+        return "detenido"
 
     def capturar_snapshot(self):
         if self._buffer:

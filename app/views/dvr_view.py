@@ -87,6 +87,9 @@ class DvrView(QWidget):
         encabezado.addWidget(QLabel("Grabadores (DVR/NVR) registrados"))
         encabezado.addStretch()
 
+        # a diferencia de "Quitar grabador", esto no borra ni desactiva nada:
+        # cualquier usuario puede usarlo (igual que "Agregar camara" en la
+        # pestana Camaras), no solo Administrador
         self.btn_detectar_nuevos = QPushButton("Detectar canales nuevos")
         self.btn_detectar_nuevos.setEnabled(False)
         self.btn_detectar_nuevos.clicked.connect(self._emitir_detectar_nuevos)
@@ -119,6 +122,30 @@ class DvrView(QWidget):
         self.texto_log.setMaximumHeight(140)
         layout.addWidget(self.texto_log)
 
+    def prellenar_desde_radar(self, info):
+        """Llamado desde el "Radar de camaras" al elegir "Usar en NVR/DVR"
+        para un hallazgo: completa marca/IP/cantidad de canales con lo que
+        se detecto (real para marca e IP; la cantidad de canales es una
+        ESTIMACION por fuentes de video ONVIF) - el usuario confirma y
+        completa usuario/clave antes de registrar (o las precarga si ya se
+        escribieron en el Radar, ej. para el "Reintentar con estas
+        credenciales")."""
+        marca = info.get("marca_app", "Hikvision")
+        if marca in MARCAS_DVR:
+            self.campo_marca.setCurrentText(marca)
+        self.campo_ip.setText(info.get("ip", ""))
+        canales = info.get("canales_detectados", 1)
+        if canales > 1:
+            self.campo_canales.setText(str(canales))
+        if not self.campo_nombre.text().strip():
+            modelo = info.get("modelo", "")
+            self.campo_nombre.setText(f"{marca} {modelo}".strip() or f"Grabador {info.get('ip', '')}")
+        if info.get("usuario"):
+            self.campo_usuario.setText(info["usuario"])
+        if info.get("clave"):
+            self.campo_clave.setText(info["clave"])
+        self.campo_usuario.setFocus()
+
     # ---------------- registrar + detectar ----------------
     def _emitir_registrar(self):
         nombre = self.campo_nombre.text().strip()
@@ -147,7 +174,7 @@ class DvrView(QWidget):
 
     def set_detectando(self, activo, total=0):
         self.btn_registrar.setEnabled(not activo)
-        self.btn_detectar_nuevos.setEnabled(not activo and self._permitido_quitar and self.tabla.selectionModel().hasSelection())
+        self.btn_detectar_nuevos.setEnabled(not activo and self.tabla.selectionModel().hasSelection())
         if activo:
             self.lbl_progreso.setText(f"Probando canal 1 de {total}...")
         else:
@@ -193,12 +220,11 @@ class DvrView(QWidget):
     def _actualizar_botones_fila(self):
         hay_seleccion = self.tabla.selectionModel().hasSelection()
         self.btn_quitar.setEnabled(self._permitido_quitar and hay_seleccion)
-        self.btn_detectar_nuevos.setEnabled(self._permitido_quitar and hay_seleccion)
+        self.btn_detectar_nuevos.setEnabled(hay_seleccion)
 
     def permitir_quitar(self, permitido):
         self._permitido_quitar = permitido
         self.btn_quitar.setVisible(permitido)
-        self.btn_detectar_nuevos.setVisible(permitido)
         self._actualizar_botones_fila()
 
     def cargar(self, dispositivos):

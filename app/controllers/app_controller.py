@@ -7,6 +7,7 @@ from app.controllers.turno_controller import TurnoController
 from app.controllers.reporte_controller import ReporteController
 from app.controllers.camara_controller import CamaraController
 from app.controllers.dvr_controller import DvrController
+from app.controllers.radar_controller import RadarController
 from app.controllers.telegram_controller import TelegramController
 
 
@@ -40,6 +41,10 @@ class AppController:
             on_camara_agregada=self.monitoreo_controller.agregar_camara,
             on_camara_quitada=self.monitoreo_controller.quitar_camara,
             programar_arranque_nativo=self.monitoreo_controller.encolar_arranque_nativo,
+        )
+        self.radar_controller = RadarController(
+            self.main_window.radar_view, self.main_window.camaras_view, self.main_window.dvr_view,
+            mostrar_seccion=self.main_window.mostrar_seccion,
         )
         self.telegram_controller = TelegramController(self.main_window.telegram_view)
 
