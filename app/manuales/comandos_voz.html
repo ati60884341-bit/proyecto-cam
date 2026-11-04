@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comandos de voz — CAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f4f3ef; --surface:#ffffff; --surface-2:#eceae3; --fg:#201f1c; --fg-muted:#5c5a54;
+  --accent:#0d7d7a; --accent-ink:#ffffff; --border:#d8d5cc;
+  --warn-bg:#fdf1dc; --warn-fg:#7a4a06; --warn-border:#eecd93;
+  --ok-bg:#e8f5ea; --ok-fg:#1f6b33; --ok-border:#bfe3c6;
+  --chip-bg:#eceae3;
+  --mono-bg:#1c1b19; --mono-fg:#e7e4da;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171a; --surface:#1d2024; --surface-2:#242830; --fg:#eceae3; --fg-muted:#9a9c9e;
+    --accent:#36d6c9; --accent-ink:#0b1413; --border:#33373d;
+    --warn-bg:#2c2415; --warn-fg:#e3b659; --warn-border:#4a3b1c;
+    --ok-bg:#15271c; --ok-fg:#7fd99a; --ok-border:#275a3a;
+    --chip-bg:#242830; --mono-bg:#0d0f11; --mono-fg:#d9d6cc; color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--fg); margin:0; font-family:"Source Sans 3", system-ui, sans-serif; line-height:1.55; padding:0 16px;}
+.envoltura{max-width:720px; margin:0 auto; padding-block:48px 80px;}
+h1,h2,h3{font-family:"Fraunces", Georgia, serif; text-wrap:balance; font-weight:600; letter-spacing:-0.01em;}
+h1{font-size:clamp(28px,6vw,40px); margin:0 0 6px;}
+.subtitulo{color:var(--fg-muted); font-size:17px; margin:0 0 40px; max-width:46ch;}
+h2{font-size:22px; margin:0 0 4px;}
+h3{font-size:16px; margin:0 0 8px; font-weight:600;}
+p{margin:0 0 14px;}
+.etiqueta-seccion{display:flex; align-items:baseline; gap:10px; margin:56px 0 18px;}
+.etiqueta-seccion .num{font-family:"IBM Plex Mono", monospace; font-size:13px; color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:2px 9px; flex-shrink:0;}
+.etiqueta-seccion hr{flex:1; border:none; border-top:1px solid var(--border); margin:0;}
+code,.mono{font-family:"IBM Plex Mono", monospace; font-size:.92em;}
+.paso{display:flex; gap:16px; margin:0 0 26px;}
+.paso .burbuja{width:30px; height:30px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; font-family:"IBM Plex Mono", monospace;}
+.paso .contenido{min-width:0; flex:1; padding-top:2px;}
+.paso .contenido p:last-child{margin-bottom:0;}
+.mockup{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; margin:4px 0 18px; position:relative;}
+.titulo-mockup{font-family:"IBM Plex Mono", monospace; font-size:11.5px; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px;}
+.campo{margin-bottom:10px; min-width:0;}
+.campo label{display:block; font-size:12.5px; color:var(--fg-muted); margin-bottom:4px;}
+.campo .caja{background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px; font-size:13.5px; font-family:"IBM Plex Mono", monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.checkfila{display:flex; align-items:center; gap:8px; font-size:13.5px; margin:10px 0;}
+.checkfila::before{content:""; width:16px; height:16px; border-radius:4px; border:2px solid var(--accent); flex-shrink:0;}
+.marca-llamada{position:absolute; width:26px; height:26px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font-family:"IBM Plex Mono", monospace; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; transform:translate(-50%,-50%); box-shadow:0 0 0 3px var(--surface);}
+figure{margin:8px 0 20px;}
+figcaption{font-size:13px; color:var(--fg-muted); margin-top:8px; text-align:center;}
+svg{width:100%; height:auto; display:block;}
+.nota{border-left:3px solid var(--border); padding:4px 0 4px 14px; color:var(--fg-muted); font-size:14.5px; margin:0 0 16px;}
+.aviso{background:var(--warn-bg); color:var(--warn-fg); border:1px solid var(--warn-border); border-radius:12px; padding:14px 16px; margin:0 0 18px; font-size:14.5px;}
+.aviso strong{display:block; margin-bottom:4px; font-family:"IBM Plex Mono", monospace; font-size:12px; text-transform:uppercase; letter-spacing:.05em;}
+.exito{background:var(--ok-bg); color:var(--ok-fg); border:1px solid var(--ok-border); border-radius:12px; padding:14px 16px; margin:0 0 18px; font-size:14.5px;}
+.chip{display:inline-block; background:var(--chip-bg); border-radius:999px; padding:3px 11px; font-size:12.5px; font-family:"IBM Plex Mono", monospace; margin:0 4px 4px 0;}
+.frase{display:inline-block; background:var(--mono-bg); color:var(--mono-fg); border-radius:999px; padding:5px 14px; font-family:"IBM Plex Mono", monospace; font-size:13px; margin:0 6px 6px 0;}
+table{width:100%; border-collapse:collapse; margin:0 0 20px; font-size:14px;}
+th,td{text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:top;}
+th{color:var(--fg-muted); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em;}
+.indice{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 44px;}
+.indice a{font-size:13px; color:var(--fg-muted); text-decoration:none; border:1px solid var(--border); border-radius:999px; padding:5px 12px;}
+.tarjeta-resumen{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px; margin:10px 0 18px;}
+.tarjeta-resumen h3{margin-bottom:12px;}
+.tarjeta-resumen .fila{display:flex; justify-content:space-between; gap:14px; padding:8px 0; border-bottom:1px dashed var(--border); font-size:14px;}
+.tarjeta-resumen .fila:last-child{border-bottom:none;}
+.tarjeta-resumen .fila .accion{color:var(--fg-muted); font-size:12.5px;}
+footer{margin-top:60px; padding-top:20px; border-top:1px solid var(--border); color:var(--fg-muted); font-size:13px;}
+footer a{color:var(--accent);}
+#zona-dinamica{display:none;}
+@media print{ body{background:#fff; color:#000;} .mockup{break-inside:avoid;} }
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+<p class="chip">Manual 2 de 2</p>
+<h1>Hablarle al sistema</h1>
+<p class="subtitulo">Cómo activar el micrófono y qué decir para mover cámaras, capturar evidencia y controlar el sistema sin tocar el mouse.</p>
+
+<nav class="indice">
+  <a href="#microfono">Activar el micrófono</a>
+  <a href="#formato">Cómo armar un comando</a>
+  <a href="#tabla">Todos los comandos</a>
+  <a href="#ptz">Mover la cámara (PTZ)</a>
+  <a href="#resumen">Tarjeta resumen</a>
+</nav>
+
+<div id="microfono"></div>
+<div class="etiqueta-seccion"><span class="num">1</span><hr></div>
+<h2>Activar el micrófono</h2>
+
+<div class="paso">
+  <div class="burbuja">1</div>
+  <div class="contenido"><p>En el <strong>Centro de Monitoreo</strong>, busca el cuadro <strong>"Asistente de comandos de voz"</strong> en el panel de la derecha.</p></div>
+</div>
+
+<figure class="mockup" style="position:relative;">
+  <div class="titulo-mockup">Centro de Monitoreo — Asistente de comandos de voz</div>
+  <div class="campo"><label>Microfono (elija el real si no reconoce bien)</label><div class="caja">Microfono (High Definition Audio Device) ▾</div></div>
+  <div class="checkfila">Activar microfono (manos libres)</div>
+  <div class="campo"><label></label><div class="caja" style="color:var(--fg-muted);">Asistente escuchando...</div></div>
+  <span class="marca-llamada" style="top:62px; left:18px;">2</span>
+  <span class="marca-llamada" style="top:112px; left:18px;">3</span>
+</figure>
+
+<div class="paso">
+  <div class="burbuja">2</div>
+  <div class="contenido">
+    <p>Elige tu micrófono real en el desplegable de arriba, en vez de dejar "Microfono por defecto de Windows". Esto evita el problema más común: que Windows siga apuntando a unos audífonos Bluetooth que ya desconectaste.</p>
+  </div>
+</div>
+
+<div class="paso">
+  <div class="burbuja">3</div>
+  <div class="contenido">
+    <p>Marca <strong>"Activar microfono"</strong>. Puede tardar unos segundos en decir <code>"Asistente escuchando..."</code> — es normal, está calibrando el micrófono.</p>
+  </div>
+</div>
+
+<div class="aviso"><strong>No hace falta decir "Ok sistema" ni nada parecido</strong>Apenas actives la casilla, el sistema ya está escuchando cada frase que digas y la compara con los comandos de la tabla de abajo.</div>
+
+<div id="formato"></div>
+<div class="etiqueta-seccion"><span class="num">2</span><hr></div>
+<h2>Cómo arma un comando el sistema</h2>
+<p>Toda frase se interpreta igual: el sistema busca en lo que dijiste <strong>qué zona</strong> nombraste y <strong>qué acción</strong> pediste — en cualquier orden, y no importan los acentos.</p>
+
+<figure>
+  <svg viewBox="0 0 640 150" role="img" aria-label="La frase 'patio ampliar' se descompone en dos partes: la palabra patio se compara contra la lista de zonas y coincide con la zona Patio; la palabra ampliar se compara contra la lista de acciones y coincide con ampliar; el sistema combina ambas y amplía la cámara de Patio.">
+    <g font-family="IBM Plex Mono, monospace" font-size="13">
+      <rect x="14" y="58" width="150" height="34" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="89" y="80" text-anchor="middle">"patio ampliar"</text>
+    </g>
+    <defs>
+      <marker id="fl2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+    </defs>
+    <line x1="164" y1="68" x2="270" y2="30" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
+    <line x1="164" y1="80" x2="270" y2="118" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
+    <rect x="272" y="8" width="120" height="44" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="332" y="26" text-anchor="middle" font-size="11" opacity="0.75">coincide con zona</text>
+    <text x="332" y="42" text-anchor="middle" font-size="13" font-weight="700">Patio</text>
+    <rect x="272" y="96" width="120" height="44" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="332" y="114" text-anchor="middle" font-size="11" opacity="0.75">coincide con accion</text>
+    <text x="332" y="130" text-anchor="middle" font-size="13" font-weight="700">Ampliar</text>
+    <line x1="392" y1="30" x2="470" y2="68" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
+    <line x1="392" y1="118" x2="470" y2="80" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
+    <rect x="472" y="56" width="154" height="38" rx="8" fill="currentColor" opacity="0.1"/>
+    <rect x="472" y="56" width="154" height="38" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <text x="549" y="80" text-anchor="middle" font-size="12.5" font-weight="700">Amplía "Patio"</text>
+  </svg>
+  <figcaption>El orden no importa: "ampliar patio" hace exactamente lo mismo que "patio ampliar".</figcaption>
+</figure>
+
+<div class="nota">El campo de texto debajo del micrófono acepta las mismas frases escritas, sin necesitar micrófono — útil para probar o para un lugar con mucho ruido.</div>
+
+<h3>Si la zona es un canal de un DVR/NVR (nombre largo)</h3>
+<p>Las zonas que crea la pestaña "NVR / DVR" se llaman por ejemplo <span class="frase">DVR Patio Central Canal 3</span>. Repetir ese nombre completo por voz es incómodo — por eso, si hay una sola zona que termine en <code>Canal 3</code>, alcanza con decir <strong>"canal 3"</strong>:</p>
+
+<figure>
+  <svg viewBox="0 0 640 110" role="img" aria-label="Decir canal 3 ampliar coincide con la unica zona cuyo nombre termina en Canal 3, aunque esa zona se llame DVR Patio Central Canal 3.">
+    <g font-family="IBM Plex Mono, monospace" font-size="12.5">
+      <rect x="14" y="36" width="150" height="38" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="89" y="60" text-anchor="middle">"canal 3 ampliar"</text>
+      <line x1="164" y1="55" x2="300" y2="55" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
+      <text x="232" y="42" text-anchor="middle" font-size="11" opacity="0.75">atajo: ¿una sola zona</text>
+      <text x="232" y="76" text-anchor="middle" font-size="11" opacity="0.75">termina en "canal 3"?</text>
+      <rect x="302" y="24" width="324" height="62" rx="8" fill="currentColor" opacity="0.1"/>
+      <rect x="302" y="24" width="324" height="62" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="464" y="50" text-anchor="middle" font-size="13" font-weight="700">DVR Patio Central Canal 3</text>
+      <text x="464" y="68" text-anchor="middle" font-size="11" opacity="0.75">(si, es la unica — coincide)</text>
+    </g>
+  </svg>
+  <figcaption>Si tienes dos grabadores con "Canal 3" cada uno, esta frase es ambigua: en ese caso di el nombre completo de la zona.</figcaption>
+</figure>
+
+<div id="tabla"></div>
+<div class="etiqueta-seccion"><span class="num">3</span><hr></div>
+<h2>Todos los comandos</h2>
+
+<table>
+  <tr><th>Qué hace</th><th>Qué decir</th></tr>
+  <tr><td>Ver una zona en pantalla completa</td><td><span class="frase">&lt;zona&gt; ampliar</span><span class="frase">&lt;zona&gt; mostrar</span></td></tr>
+  <tr><td>Capturar evidencia (foto firmada)</td><td><span class="frase">&lt;zona&gt; capturar</span><span class="frase">&lt;zona&gt; foto</span></td></tr>
+  <tr><td>Acercar (zoom digital)</td><td><span class="frase">&lt;zona&gt; acercar</span><span class="frase">&lt;zona&gt; zoom</span></td></tr>
+  <tr><td>Alejar</td><td><span class="frase">&lt;zona&gt; alejar</span></td></tr>
+  <tr><td>Quitar el zoom</td><td><span class="frase">&lt;zona&gt; zoom normal</span></td></tr>
+  <tr><td>Ver todas las zonas</td><td><span class="frase">vista general</span> (sin zona)</td></tr>
+</table>
+
+<div id="ptz"></div>
+<div class="etiqueta-seccion"><span class="num">4</span><hr></div>
+<h2>Mover la cámara (PTZ) y posiciones guardadas</h2>
+<div class="aviso"><strong>Solo funciona si la cámara tiene motor</strong>Esto solo aplica a cámaras marcadas con "Tiene motor PTZ" al agregarlas (ver Manual 1, sección 1). Si tu cámara es fija, estos comandos no hacen nada — y el sistema te lo dice al instante, sin intentarlo.</div>
+
+<table>
+  <tr><th>Qué hace</th><th>Qué decir</th></tr>
+  <tr><td>Mover la cámara</td><td><span class="frase">&lt;zona&gt; mover izquierda</span><span class="frase">&lt;zona&gt; mover derecha</span><span class="frase">&lt;zona&gt; mover arriba</span><span class="frase">&lt;zona&gt; mover abajo</span></td></tr>
+  <tr><td>Guardar la posición actual como preset (1 al 9)</td><td><span class="frase">&lt;zona&gt; preset N guardar</span></td></tr>
+  <tr><td>Ir a una posición ya guardada</td><td><span class="frase">&lt;zona&gt; preset N</span> (sin decir "guardar")</td></tr>
+</table>
+<p class="nota">Los presets quedan grabados en la propia cámara, no en la computadora — si cambias de cámara en esa zona, tiene que guardar sus propios presets de nuevo.</p>
+
+<div id="resumen"></div>
+<div class="etiqueta-seccion"><span class="num">5</span><hr></div>
+<h2>Tarjeta resumen</h2>
+<p>Imprime esta sección (Ctrl+P desde tu navegador) o déjala abierta cerca del operador nuevo durante sus primeros turnos.</p>
+
+<div class="tarjeta-resumen">
+  <h3>Ejemplos listos para decir</h3>
+  <div class="fila"><span class="frase" style="margin:0;">patio ampliar</span><span class="accion">pantalla completa de Patio</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">ingreso capturar</span><span class="accion">foto firmada de Ingreso</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">estacionamiento acercar</span><span class="accion">zoom en Estacionamiento</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">canal 3 ampliar</span><span class="accion">atajo para zonas de un DVR/NVR</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">patio mover derecha</span><span class="accion">solo camaras con motor PTZ</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">patio preset 1 guardar</span><span class="accion">guarda la posicion actual</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">patio preset 1</span><span class="accion">va a esa posicion guardada</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">vista general</span><span class="accion">muestra todas las zonas</span></div>
+</div>
+
+<div class="nota">El botón <strong>"Ver manual de comandos"</strong> dentro del programa (en el mismo panel del micrófono) muestra esta lista ajustada a las cámaras que tienes agregadas ahora mismo: si ninguna tiene PTZ, esa sección ni aparece.</div>
+
+<footer>Manual 2 de 2 — Comandos de voz. El manual de cámaras se abre desde el mismo menú "Manuales" del programa.</footer>
+</div>
+</body>
+</html>

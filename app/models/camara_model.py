@@ -8,7 +8,8 @@ def listar(incluir_inactivas=False):
     de una vez. incluir_inactivas=True es para auditoria/depuracion."""
     filtro = "" if incluir_inactivas else "WHERE c.Estado = N'Activa'"
     return query(
-        "SELECT c.IdCamara, c.IdZona, z.Nombre AS Zona, c.Nombre, c.Marca, c.TipoConexion, c.UrlConexion, c.Estado "
+        "SELECT c.IdCamara, c.IdZona, z.Nombre AS Zona, c.Nombre, c.Marca, c.TipoConexion, c.UrlConexion, "
+        "c.Estado, c.TienePTZ "
         f"FROM cam.Camaras c JOIN cam.Zonas z ON z.IdZona = c.IdZona {filtro} ORDER BY c.IdZona"
     )
 
@@ -17,12 +18,16 @@ def actualizar_estado(id_camara, estado):
     execute("UPDATE cam.Camaras SET Estado = ? WHERE IdCamara = ?", (estado, id_camara))
 
 
-def crear(id_zona, nombre, marca, tipo_conexion, url_conexion):
+def crear(id_zona, nombre, marca, tipo_conexion, url_conexion, id_dispositivo=None, canal=None, tiene_ptz=False):
     """Registra una camara nueva. Cualquier marca es compatible: RTSP sirve
-    para Hikvision/Dahua/Tapo/cualquier IP generica, USB para webcams."""
+    para Hikvision/Dahua/Tapo/cualquier IP generica, USB para webcams.
+    id_dispositivo/canal solo se usan cuando la camara viene de un canal de
+    la pestana "NVR / DVR" (alta masiva); para una camara independiente
+    quedan en NULL. tiene_ptz es una capacidad POR CAMARA, no por marca:
+    una misma marca vende tanto domos PTZ como camaras fijas."""
     return execute(
-        "INSERT INTO cam.Camaras (IdZona, Nombre, Marca, TipoConexion, UrlConexion) "
-        "OUTPUT INSERTED.IdCamara VALUES (?, ?, ?, ?, ?)",
-        (id_zona, nombre, marca, tipo_conexion, url_conexion),
+        "INSERT INTO cam.Camaras (IdZona, Nombre, Marca, TipoConexion, UrlConexion, IdDispositivo, Canal, TienePTZ) "
+        "OUTPUT INSERTED.IdCamara VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (id_zona, nombre, marca, tipo_conexion, url_conexion, id_dispositivo, canal, tiene_ptz),
         return_id=True,
     )

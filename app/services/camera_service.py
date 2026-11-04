@@ -294,3 +294,54 @@ class PruebaConexionThread(QThread):
             )
         finally:
             captura.release()
+
+
+class DeteccionCanalesDVRThread(QThread):
+    """Prueba de una sola vez todos los canales de un DVR/NVR (Hikvision o
+    Dahua): en vez de agregar camara por camara, se registra el dispositivo
+    (IP, usuario, clave, cantidad de canales) y esto devuelve cuales canales
+    respondieron con imagen real, listos para darse de alta todos juntos."""
+
+    progreso = pyqtSignal(int, int)  # canal_actual, total
+    resultado = pyqtSignal(list)  # [{"canal": int, "url": str, "resolucion": "WxH"}, ...]
+
+    def __init__(self, marca, ip, puerto, usuario, clave, cantidad_canales, canales_a_omitir=None, parent=None):
+        super().__init__(parent)
+        self.marca = marca
+        self.ip = ip
+        self.puerto = puerto
+        self.usuario = usuario
+        self.clave = clave
+        self.cantidad_canales = cantidad_canales
+        # canales que ya tienen una camara activa (de una deteccion previa):
+        # se saltan para no duplicarlos ni interrumpir su transmision
+        self.canales_a_omitir = canales_a_omitir or set()
+
+    def run(self):
+        from app.services.dvr_urls import construir_url_canal
+
+        # el host/puerto es el mismo para los N canales de un mismo
+        # dispositivo: si no responde, no tiene sentido reintentar la
+        # verificacion TCP (2s) canal por canal
+        url_prueba = construir_url_canal(self.marca, self.ip, self.puerto, self.usuario, self.clave, 1, True)
+        if not _servidor_alcanzable(url_prueba, timeout=3.0):
+            self.resultado.emit([])
+            return
+
+        encontrados = []
+        for canal in range(1, self.cantidad_canales + 1):
+            self.progreso.emit(canal, self.cantidad_canales)
+            if canal in self.canales_a_omitir:
+                continue
+            url = construir_url_canal(self.marca, self.ip, self.puerto, self.usuario, self.clave, canal, True)
+            captura = _abrir_captura_sin_bloqueo("RTSP", url)
+            if not captura or not captura.isOpened():
+                continue
+            try:
+                ok, frame = captura.read()
+                if ok and frame is not None:
+                    alto, ancho = frame.shape[:2]
+                    encontrados.append({"canal": canal, "url": url, "resolucion": f"{ancho}x{alto}"})
+            finally:
+                captura.release()
+        self.resultado.emit(encontrados)

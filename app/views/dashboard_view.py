@@ -3,12 +3,13 @@ import math
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox, QPushButton,
-    QLabel, QLineEdit, QTextEdit, QCheckBox, QDialog, QScrollArea,
+    QLabel, QLineEdit, QTextEdit, QCheckBox, QComboBox, QDialog, QScrollArea,
 )
 
 from app.views.UI.zona_frame import ZonaFrame
+from app.services.voice_service import listar_microfonos
 
-MANUAL_COMANDOS_HTML = """
+MANUAL_COMANDOS_INTRO_HTML = """
 <h2>Manual de comandos de voz</h2>
 <p>Formato simple: diga la <b>zona</b> y luego la <b>accion</b> (en cualquier
 orden). No hace falta ninguna palabra de activacion. El campo de texto manual
@@ -35,18 +36,48 @@ de cualquier zona nueva que haya agregado en "Camaras").</p>
 <li><i>"&lt;zona&gt; zoom normal"</i> / <i>"&lt;zona&gt; quitar zoom"</i> — vuelve a 1x</li>
 </ul>
 <p>El zoom tambien se aplica a la vista ampliada de esa zona si esta abierta.</p>
+"""
 
-<h3>Mover la camara (PTZ real, ej. Tapo C510W)</h3>
+# esta parte NO es texto fijo: solo se agrega al manual si al menos una
+# camara registrada ahora mismo tiene marcado "Tiene motor PTZ" (ver
+# pestanas Camaras / NVR-DVR). Es justamente la idea de "el programa
+# adapta los comandos a lo que la camara agregada puede hacer de verdad",
+# en vez de listar funciones que la mayoria de camaras no tiene.
+MANUAL_COMANDOS_PTZ_HTML = """
+<h3>Mover la camara (PTZ real)</h3>
+<p>Disponible ahora mismo en: <b>{zonas_ptz}</b>.</p>
 <ul>
 <li><i>"&lt;zona&gt; mover izquierda"</i> — ej. "patio mover izquierda"</li>
 <li><i>"&lt;zona&gt; mover derecha"</i></li>
 <li><i>"&lt;zona&gt; mover arriba"</i></li>
 <li><i>"&lt;zona&gt; mover abajo"</i></li>
-<li><i>"&lt;zona&gt; girar izquierda"</i></li>
 </ul>
-<p>Solo funciona con camaras RTSP que tengan motor Pan/Tilt y soporten ONVIF
-(como la Tapo C510W). Se necesita el usuario/clave de la "Cuenta de camara"
-(RTSP) configurados en la app Tapo; el puerto ONVIF de Tapo es 2020.</p>
+<p>Requiere que la camara soporte ONVIF (ej. Tapo C510W), con el
+usuario/clave de su "Cuenta de camara" RTSP.</p>
+
+<h3>Posiciones PTZ guardadas (presets)</h3>
+<ul>
+<li><i>"&lt;zona&gt; preset N guardar"</i> — guarda la posicion ACTUAL como el preset N (1 al 9) — ej. "patio preset 1 guardar"</li>
+<li><i>"&lt;zona&gt; preset N"</i> (sin verbo) — va al preset N ya guardado — ej. "patio preset 1"</li>
+</ul>
+<p>Los presets quedan grabados en la propia camara (no en esta base de
+datos), asi que sobreviven aunque se reinicie el programa o la PC.</p>
+"""
+
+MANUAL_COMANDOS_SIN_PTZ_HTML = """
+<h3>Mover la camara (PTZ) y presets</h3>
+<p>Ninguna de sus camaras registradas tiene marcado "Tiene motor PTZ" ahora
+mismo, asi que estos comandos no aparecen activos. Si agrega una camara con
+motor (pestana "Camaras" o "NVR / DVR") y marca esa casilla, esta seccion
+se completa sola con las zonas que ya pueden moverse.</p>
+"""
+
+MANUAL_COMANDOS_RESTO_HTML = """
+<h3>Decir solo "canal N" (zonas de un DVR/NVR)</h3>
+<p>Las zonas que crea la pestana "NVR / DVR" se llaman por ejemplo
+"DVR Patio Central Canal 3". Repetir ese nombre completo por voz es
+incomodo: si solo hay UNA zona que termine en "Canal 3", alcanza con decir
+<i>"canal 3 ampliar"</i>, <i>"canal 3 capturar"</i>, etc.</p>
 
 <h3>Vista general</h3>
 <ul>
@@ -67,10 +98,18 @@ panel derecho, que funciona siempre.</p>
 <li>"ingreso capturar"</li>
 <li>"estacionamiento acercar"</li>
 <li>"estacionamiento alejar"</li>
-<li>"patio mover derecha"</li>
+<li>"canal 3 ampliar"</li>
 <li>"vista general"</li>
+{ejemplos_ptz}
 </ul>
+
+<p style="margin-top:14px;"><i>Para el manual ilustrado completo (con diagramas), vea la pestana
+"Manuales".</i></p>
 """
+
+EJEMPLOS_PTZ_HTML = """<li>"patio mover derecha"</li>
+<li>"patio preset 1 guardar"</li>
+<li>"patio preset 1"</li>"""
 
 
 class DashboardView(QWidget):
@@ -88,6 +127,7 @@ class DashboardView(QWidget):
         self.zona_frames = {}
         self._siguiente_posicion = 0
         self._columnas = 2
+        self._zonas_con_ptz = []
 
         layout_raiz = QHBoxLayout(self)
 
@@ -104,13 +144,27 @@ class DashboardView(QWidget):
         desplazable = QScrollArea()
         desplazable.setWidgetResizable(True)
         desplazable.setWidget(self.panel_zonas)
-        layout_raiz.addWidget(desplazable, stretch=3)
+        layout_raiz.addWidget(desplazable, stretch=1)
 
         # -------- panel derecho: asistente de voz, panico, fatiga --------
-        panel_derecho = QVBoxLayout()
+        # con un ancho maximo fijo (no un "stretch" relativo al resto): sin
+        # esto, en una ventana grande este panel terminaba ocupando casi la
+        # mitad de la pantalla para solo un par de botones y un combo
+        ANCHO_MAXIMO_PANEL_DERECHO = 360
+        panel_derecho_widget = QWidget()
+        panel_derecho_widget.setMaximumWidth(ANCHO_MAXIMO_PANEL_DERECHO)
+        panel_derecho = QVBoxLayout(panel_derecho_widget)
 
         grupo_voz = QGroupBox("Asistente de comandos de voz")
         v = QVBoxLayout(grupo_voz)
+
+        v.addWidget(QLabel("Microfono (elija el real si no reconoce bien):"))
+        self.combo_microfono = QComboBox()
+        self.combo_microfono.addItem("Microfono por defecto de Windows", None)
+        for indice, nombre in listar_microfonos():
+            self.combo_microfono.addItem(nombre, indice)
+        v.addWidget(self.combo_microfono)
+
         self.chk_voz = QCheckBox("Activar microfono (manos libres)")
         self.chk_voz.toggled.connect(self.asistente_voz_alternado.emit)
         v.addWidget(self.chk_voz)
@@ -164,7 +218,7 @@ class DashboardView(QWidget):
         r.addWidget(self.texto_log)
         panel_derecho.addWidget(grupo_registro, stretch=1)
 
-        layout_raiz.addLayout(panel_derecho, stretch=2)
+        layout_raiz.addWidget(panel_derecho_widget)
 
     # ---------------- zonas / camaras ----------------
     def _agregar_tile(self, camara):
@@ -202,14 +256,33 @@ class DashboardView(QWidget):
             self.comando_manual_enviado.emit(texto)
             self.campo_comando.clear()
 
+    def actualizar_disponibilidad_ptz(self, zonas_con_ptz):
+        """El controlador llama esto cada vez que cambian las camaras
+        registradas: el manual de comandos (boton de abajo) se arma de
+        nuevo con esta lista, para solo mostrar mover/presets si de verdad
+        hay una camara con motor PTZ agregada ahora mismo."""
+        self._zonas_con_ptz = list(zonas_con_ptz)
+
     def _mostrar_manual(self):
+        if self._zonas_con_ptz:
+            bloque_ptz = MANUAL_COMANDOS_PTZ_HTML.format(zonas_ptz=", ".join(self._zonas_con_ptz))
+            ejemplos_ptz = EJEMPLOS_PTZ_HTML
+        else:
+            bloque_ptz = MANUAL_COMANDOS_SIN_PTZ_HTML
+            ejemplos_ptz = ""
+        html = (
+            MANUAL_COMANDOS_INTRO_HTML
+            + bloque_ptz
+            + MANUAL_COMANDOS_RESTO_HTML.format(ejemplos_ptz=ejemplos_ptz)
+        )
+
         dialogo = QDialog(self)
         dialogo.setWindowTitle("Manual de comandos de voz")
         dialogo.resize(560, 600)
         layout = QVBoxLayout(dialogo)
         texto = QTextEdit()
         texto.setReadOnly(True)
-        texto.setHtml(MANUAL_COMANDOS_HTML)
+        texto.setHtml(html)
         layout.addWidget(texto)
         dialogo.exec()
 
@@ -218,6 +291,11 @@ class DashboardView(QWidget):
 
     def zona_widget(self, nombre_zona):
         return self.zona_frames.get(nombre_zona)
+
+    def microfono_seleccionado(self):
+        """None = microfono por defecto de Windows; si no, el indice del
+        dispositivo elegido en el desplegable."""
+        return self.combo_microfono.currentData()
 
     def set_boton_confirmar_urgente(self, urgente):
         """Pone el boton de fatiga en rojo cuando hay que confirmar: si se

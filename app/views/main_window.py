@@ -9,7 +9,10 @@ from app.views.evidencias_view import EvidenciasView
 from app.views.turnos_view import TurnosView
 from app.views.reportes_view import ReportesView
 from app.views.camaras_view import CamarasView
+from app.views.dvr_view import DvrView
 from app.views.telegram_view import TelegramView
+from app.views.manuales_view import ManualesView
+from app.views.UI.pantalla import tamano_adaptado
 
 
 class MainWindow(QMainWindow):
@@ -20,7 +23,9 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.usuario = usuario
         self.setWindowTitle("CAM - Centro de Monitoreo Inteligente")
-        self.resize(1280, 800)
+        # 1280x800 es el tamano ideal, pero en una laptop con pantalla chica
+        # (ej. 1366x768, muy comun) se ajusta para que entre completa
+        self.resize(*tamano_adaptado(1280, 800))
 
         contenedor = QWidget()
         self.setCentralWidget(contenedor)
@@ -46,8 +51,10 @@ class MainWindow(QMainWindow):
             ("evidencias", "Evidencias"),
             ("turnos", "Turnos"),
             ("camaras", "Camaras"),
+            ("dvr", "NVR / DVR"),
             ("telegram", "Alertas Telegram"),
             ("reportes", "Reportes"),
+            ("manuales", "Manuales"),
         ]:
             boton = QPushButton(texto)
             boton.setStyleSheet(
@@ -72,8 +79,10 @@ class MainWindow(QMainWindow):
         self.evidencias_view = EvidenciasView()
         self.turnos_view = TurnosView()
         self.camaras_view = CamarasView()
+        self.dvr_view = DvrView()
         self.telegram_view = TelegramView()
         self.reportes_view = ReportesView()
+        self.manuales_view = ManualesView()
 
         for clave, vista in [
             ("dashboard", self.dashboard_view),
@@ -81,8 +90,10 @@ class MainWindow(QMainWindow):
             ("evidencias", self.evidencias_view),
             ("turnos", self.turnos_view),
             ("camaras", self.camaras_view),
+            ("dvr", self.dvr_view),
             ("telegram", self.telegram_view),
             ("reportes", self.reportes_view),
+            ("manuales", self.manuales_view),
         ]:
             self.stack.addWidget(vista)
 
@@ -97,7 +108,9 @@ class MainWindow(QMainWindow):
             "evidencias": self.evidencias_view,
             "turnos": self.turnos_view,
             "camaras": self.camaras_view,
+            "dvr": self.dvr_view,
             "telegram": self.telegram_view,
             "reportes": self.reportes_view,
+            "manuales": self.manuales_view,
         }
         self.stack.setCurrentWidget(vistas[clave])

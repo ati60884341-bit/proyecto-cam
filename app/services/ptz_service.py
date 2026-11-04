@@ -76,3 +76,73 @@ class MovimientoPTZThread(QThread):
                 False,
                 f"No se pudo mover la camara via ONVIF (puerto {puerto}): {exc}",
             )
+
+
+class PresetPTZThread(QThread):
+    """Guarda o va a una posicion PTZ guardada (preset) via ONVIF - ej.
+    "patio preset 1 guardar" / "patio preset 1". Los presets quedan
+    grabados en la propia camara (no en esta base de datos): se
+    identifican por nombre ("Preset1".."Preset9") y se buscan con
+    GetPresets cada vez, porque el PresetToken que asigna cada marca/modelo
+    no es predecible de antemano."""
+
+    resultado = pyqtSignal(bool, str)
+
+    def __init__(self, url_rtsp, marca, numero, accion, parent=None):
+        super().__init__(parent)
+        self.url_rtsp = url_rtsp
+        self.marca = marca
+        self.numero = numero
+        self.accion = accion  # "guardar" | "ir"
+
+    def run(self):
+        if self.accion not in ("guardar", "ir"):
+            self.resultado.emit(False, f"Accion de preset no reconocida: {self.accion}")
+            return
+
+        try:
+            from onvif import ONVIFCamera
+        except ImportError:
+            self.resultado.emit(False, "onvif-zeep no esta instalado: no se pueden usar presets PTZ.")
+            return
+
+        host, puerto, usuario, clave = _datos_conexion(self.url_rtsp, self.marca)
+        if not host or not usuario:
+            self.resultado.emit(False, "La camara no tiene usuario/host ONVIF (revise la URL RTSP).")
+            return
+
+        nombre_preset = f"Preset{self.numero}"
+        try:
+            camara = ONVIFCamera(host, puerto, usuario, clave)
+            media = camara.create_media_service()
+            perfil = media.GetProfiles()[0]
+            ptz = camara.create_ptz_service()
+
+            presets_existentes = ptz.GetPresets({"ProfileToken": perfil.token})
+            token_existente = next(
+                (p.token for p in presets_existentes if getattr(p, "Name", None) == nombre_preset), None,
+            )
+
+            if self.accion == "guardar":
+                solicitud = ptz.create_type("SetPreset")
+                solicitud.ProfileToken = perfil.token
+                solicitud.PresetName = nombre_preset
+                if token_existente:
+                    solicitud.PresetToken = token_existente  # actualiza el existente en vez de crear otro
+                ptz.SetPreset(solicitud)
+                self.resultado.emit(True, f"Posicion actual guardada como preset {self.numero}")
+            else:
+                if not token_existente:
+                    self.resultado.emit(
+                        False, f"No hay ningun preset {self.numero} guardado todavia en esta camara.",
+                    )
+                    return
+                solicitud = ptz.create_type("GotoPreset")
+                solicitud.ProfileToken = perfil.token
+                solicitud.PresetToken = token_existente
+                ptz.GotoPreset(solicitud)
+                self.resultado.emit(True, f"Camara movida al preset {self.numero}")
+        except Exception as exc:
+            self.resultado.emit(
+                False, f"No se pudo usar el preset PTZ (puerto {puerto}): {exc}",
+            )

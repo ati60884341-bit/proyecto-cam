@@ -15,6 +15,11 @@ block_cipher = None
 # evita duplicar los .py, que ya se empaquetan via el analisis de imports.
 datas = collect_data_files("mediapipe", include_py_files=False)
 
+# manuales ilustrados (pestana "Manuales"): se abren con el navegador del
+# sistema vía app.config.MANUALES_DIR, que en el .exe apunta a sys._MEIPASS
+datas += [("app/manuales/conectar_camaras.html", "app/manuales"),
+          ("app/manuales/comandos_voz.html", "app/manuales")]
+
 hiddenimports = [
     "pyttsx3.drivers",
     "pyttsx3.drivers.sapi5",

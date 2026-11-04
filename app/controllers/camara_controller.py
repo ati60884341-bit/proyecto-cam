@@ -43,6 +43,7 @@ class CamaraController:
             zona = zona_model.obtener_o_crear(datos["zona"])
             id_camara = camara_model.crear(
                 zona["IdZona"], datos["nombre"], datos["marca"], datos["tipo_conexion"], datos["url"],
+                tiene_ptz=datos.get("tiene_ptz", False),
             )
         except Exception as exc:
             traceback.print_exc()
@@ -52,6 +53,7 @@ class CamaraController:
             "IdCamara": id_camara, "IdZona": zona["IdZona"], "Zona": zona["Nombre"],
             "Nombre": datos["nombre"], "Marca": datos["marca"],
             "TipoConexion": datos["tipo_conexion"], "UrlConexion": datos["url"], "Estado": "Activa",
+            "TienePTZ": datos.get("tiene_ptz", False),
         }
         self.cargar()
         # la confirmacion se ve en la bitacora del Centro de Monitoreo (sin

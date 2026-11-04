@@ -42,6 +42,11 @@ Esto crea la base `bd_cam_seguridad`, el esquema `cam` y **5 triggers**:
 
 Puede probarlos con `db/04_test_triggers.sql`.
 
+Para la pestana "NVR / DVR" (alta masiva de canales, ver seccion 4) corra
+tambien `db/06_dispositivos_dvr.sql` una vez (agrega la tabla
+`cam.DispositivosDVR` y dos columnas en `cam.Camaras`, no borra nada de lo
+existente).
+
 Si otras laptops van a conectarse a esta base por red (no desde esta misma
 PC), vea `db/05_acceso_red.sql` y la seccion 7 de este documento.
 
@@ -112,6 +117,22 @@ Usuarios de demo (clave para ambos: `123456`):
    router/switch) que esta PC, con el servicio RTSP habilitado en su
    configuracion de red (puerto por defecto `554`).
 
+   **Un DVR/NVR entero de una sola vez (pestana "NVR / DVR"):** la pestana
+   "Camaras" agrega una camara a la vez; si lo que tiene es un grabador con
+   varios canales (un DVR para camaras analogicas, o un NVR para camaras
+   IP — cada canal es una camara conectada al grabador), use la pestana
+   "NVR / DVR" en vez: registre el grabador UNA sola vez (nombre, marca,
+   IP, usuario, clave y **cuantos canales tiene**) y pulse "Registrar y
+   detectar todos los canales". El sistema prueba cada canal (igual que
+   hace el software del fabricante — iVMS-4200 de Hikvision, SmartPSS de
+   Dahua — al "buscar" camaras) y agrega solo una camara por cada uno que
+   responda, cada una en su propia zona (`<Nombre> Canal N`), visibles de
+   inmediato en el Centro de Monitoreo. Si despues conecta canales nuevos
+   al mismo grabador, seleccionelo en la tabla y pulse "Detectar canales
+   nuevos" (salta los que ya tiene, no los duplica). "Quitar grabador y
+   sus camaras" detiene todas sus camaras en vivo y las marca inactivas de
+   una sola vez (solo Administrador).
+
    **Camaras USB/integradas en otra laptop:** el indice de la webcam no es
    siempre 0 (varia segun el equipo). Con conexion "USB" seleccionada,
    pulse **"Detectar camaras USB disponibles"**: prueba los indices 0 a 4
@@ -128,14 +149,38 @@ Usuarios de demo (clave para ambos: `123456`):
     seccion 6) y muestre el QR para que el jurado se una desde su celular.
     Cuando tape la camara o active el modo panico, la foto + firma SHA-256
     le llega al instante a su propio telefono.
+12. **Manuales ilustrados**: la pestana **"Manuales"** trae dos guias con
+    diagramas para quien recien usa el programa — "Conectar tus camaras"
+    (IP/WiFi, DVR/NVR completo, USB) y "Comandos de voz". Se abren en el
+    navegador del sistema y funcionan **sin internet** (vienen guardadas
+    dentro del programa, en `app/manuales/`). Cada una tambien tiene un
+    "Copiar enlace" a su version web (publicada como Artifact), por si hay
+    que compartirla con alguien que aun no tiene el programa instalado, o
+    pedir que se le agregue contenido (ej. el usuario/clave real de un
+    equipo a modo de ejemplo) sin editar el archivo a mano.
+
+    **"Cámaras" vs. "NVR / DVR", cuándo usar cada una**: no son lo mismo.
+    "Cámaras" agrega una cámara/canal a la vez (útil para una IP suelta, o
+    sumar una cámara a un grabador que ya registró); "NVR / DVR" registra
+    el grabador completo y agrega todos sus canales de una sola vez. El
+    propio asistente de "Cámaras" avisa cuándo conviene usar la otra
+    pestaña en su lugar.
 
 ## 5. Manual de comandos de voz
 
 Formato simple: diga la **zona** y luego la **accion** (en cualquier orden,
 sin palabra de activacion). El campo de texto manual del dashboard acepta
 las mismas frases, sin microfono. Zonas reconocidas: `ingreso`, `patio`,
-`estacionamiento`, `pasillo`, y cualquier zona nueva que haya agregado desde
-la pestana "Camaras". El reconocimiento usa espanol latino (`es-PE`).
+`estacionamiento`, `pasillo`, cualquier zona nueva que haya agregado desde
+la pestana "Camaras", y las que crea la pestana "NVR / DVR" (ver seccion
+4). El reconocimiento usa espanol latino (`es-PE`) y no distingue tildes
+(decir "deposito" o "depósito" da lo mismo).
+
+**Zonas de un DVR/NVR, con nombres largos**: esas zonas se llaman
+"`<Nombre del grabador>` Canal N" (ej. "DVR Patio Central Canal 3"). Repetir
+el nombre completo del grabador por voz es incomodo, asi que si hay una
+sola zona que termine en "Canal N", alcanza con decir `"canal N"` seguido
+de la accion — ej. *"canal 3 ampliar"*.
 
 **Si no reconoce bien**: el desplegable sobre la casilla de activar microfono
 lista todos los dispositivos de entrada de audio detectados — elija su
@@ -154,17 +199,38 @@ del driver de audio + hilos de camara activos); mientras tanto se muestra
 | Alejar (zoom out) | "`<zona>` alejar" |
 | Restablecer el zoom | "`<zona>` zoom normal" / "`<zona>` quitar zoom" |
 | Mover la camara (PTZ real) | "`<zona>` mover izquierda / derecha / arriba / abajo" / "`<zona>` girar izquierda" |
+| Guardar posicion PTZ (preset 1-9) | "`<zona>` preset N guardar" / "`<zona>` preset N grabar" / "`<zona>` preset N memoriza" |
+| Ir a una posicion PTZ guardada | "`<zona>` preset N" (sin verbo) |
 | Vista general | "vista general" (no necesita zona) |
 
 Ejemplos: *"patio ampliar"*, *"ingreso capturar"*, *"estacionamiento acercar"*,
-*"patio mover derecha"*.
+*"patio mover derecha"*, *"patio preset 1 guardar"*, *"patio preset 1"*,
+*"canal 3 ampliar"*.
 
-**Mover la camara** solo funciona con camaras RTSP de motor Pan/Tilt que
-soporten ONVIF (como la Tapo C510W): usa el mismo usuario/clave de la "Cuenta
-de camara" (RTSP) configurados en la app Tapo, contra el puerto ONVIF 2020.
-Si la camara no tiene motor, o el puerto/credenciales no son correctos, el
-sistema lo informa en la bitacora de eventos sin interrumpir el resto de la
-app.
+**Mover la camara y los presets** solo funcionan con camaras RTSP de motor
+Pan/Tilt que soporten ONVIF (como la Tapo C510W): usan el mismo
+usuario/clave de la "Cuenta de camara" (RTSP) configurados en la app Tapo,
+contra el puerto ONVIF 2020. Si la camara no tiene motor, o el
+puerto/credenciales no son correctos, el sistema lo informa en la bitacora
+de eventos sin interrumpir el resto de la app. Los presets quedan grabados
+**en la propia camara** (no en esta base de datos): un preset guardado con
+una marca/modelo PTZ puede no ser compatible con otra.
+
+**Importante — el PTZ se declara por CAMARA, no por marca.** Al agregar una
+camara (pestana "Camaras") o un grabador (pestana "NVR / DVR") hay una
+casilla "tiene motor PTZ": una misma marca vende tanto domos PTZ como
+camaras fijas, asi que el programa nunca asume la capacidad por marca —
+solo ofrece mover/presets en las camaras donde usted marco que si tienen
+motor. Esta es la base para que, mas adelante, cada camara pueda tener su
+propio set de funciones (en vez de un comportamiento fijo igual para
+todas, como en el software propio de cada fabricante).
+
+El boton **"Ver manual de comandos"** del dashboard refleja esto: la
+seccion de mover/presets solo aparece (y lista las zonas exactas donde
+funciona) si al menos una camara registrada ahora mismo tiene el motor
+marcado; si no, explica que falta marcarlo en vez de listar comandos que
+no van a hacer nada. Se recalcula solo cada vez que se agrega o se quita
+una camara.
 
 El zoom es digital (recorta y escala la imagen en vivo), de x1.0 a x3.0 en
 pasos de x0.5, y se aplica tanto al recuadro de la zona como a su vista
@@ -283,3 +349,6 @@ tocar el `.exe`.
   ejemplo (IPs ficticias). Reemplacelas por las de camaras reales
   (Hikvision/Dahua/Tapo) en la tabla `cam.Camaras` para que transmitan en vivo.
 - La contrasena de los usuarios de demo es `123456` (SHA-256 almacenado).
+- La ventana principal y la vista ampliada de una zona se achican solas si
+  la laptop tiene una pantalla chica (ej. 1366x768, muy comun), para que
+  siempre entren completas sin tapar la barra de tareas de Windows.

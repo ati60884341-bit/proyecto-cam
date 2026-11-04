@@ -31,11 +31,19 @@ if getattr(sys, "frozen", False):
     # Program Files (sin permiso de escritura sin ser administrador), asi
     # que las evidencias se guardan en una carpeta de datos del usuario
     BASE_DIR = os.path.join(os.environ["LOCALAPPDATA"], "ProyectoCAM")
+    # recursos estaticos empaquetados (manuales, etc.): van dentro del propio
+    # .exe/carpeta de PyInstaller, NO en BASE_DIR (que es de solo escritura
+    # de datos del usuario) - sys._MEIPASS apunta ahi tanto en --onefile
+    # como en --onedir
+    RECURSOS_DIR = sys._MEIPASS
 else:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    RECURSOS_DIR = BASE_DIR
 
 EVIDENCIAS_DIR = os.path.join(BASE_DIR, "evidencias")
 os.makedirs(EVIDENCIAS_DIR, exist_ok=True)
+
+MANUALES_DIR = os.path.join(RECURSOS_DIR, "app", "manuales")
 
 # BUFFER_SEGUNDOS = segundos que guarda la "maquina del tiempo" antes de un sabotaje
 BUFFER_SEGUNDOS = 8

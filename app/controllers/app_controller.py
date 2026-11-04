@@ -6,6 +6,7 @@ from app.controllers.evidencia_controller import EvidenciaController
 from app.controllers.turno_controller import TurnoController
 from app.controllers.reporte_controller import ReporteController
 from app.controllers.camara_controller import CamaraController
+from app.controllers.dvr_controller import DvrController
 from app.controllers.telegram_controller import TelegramController
 
 
@@ -30,6 +31,12 @@ class AppController:
         )
         self.camara_controller = CamaraController(
             self.main_window.camaras_view, usuario,
+            on_camara_agregada=self.monitoreo_controller.agregar_camara,
+            on_camara_quitada=self.monitoreo_controller.quitar_camara,
+            programar_arranque_nativo=self.monitoreo_controller.encolar_arranque_nativo,
+        )
+        self.dvr_controller = DvrController(
+            self.main_window.dvr_view, usuario,
             on_camara_agregada=self.monitoreo_controller.agregar_camara,
             on_camara_quitada=self.monitoreo_controller.quitar_camara,
             programar_arranque_nativo=self.monitoreo_controller.encolar_arranque_nativo,

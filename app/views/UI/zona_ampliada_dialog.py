@@ -2,6 +2,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel
 
 from app.views.UI.zona_frame import frame_a_pixmap
+from app.views.UI.pantalla import tamano_adaptado
 
 
 class ZonaAmpliadaDialog(QDialog):
@@ -10,7 +11,7 @@ class ZonaAmpliadaDialog(QDialog):
     def __init__(self, nombre_zona, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Zona ampliada: {nombre_zona}")
-        self.resize(900, 650)
+        self.resize(*tamano_adaptado(900, 650))
         layout = QVBoxLayout(self)
         self.video_label = QLabel("Cargando video...")
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

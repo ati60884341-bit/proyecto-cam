@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conectar tus cámaras — CAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f4f3ef; --surface:#ffffff; --surface-2:#eceae3; --fg:#201f1c; --fg-muted:#5c5a54;
+  --accent:#0d7d7a; --accent-ink:#ffffff; --border:#d8d5cc;
+  --warn-bg:#fdf1dc; --warn-fg:#7a4a06; --warn-border:#eecd93;
+  --ok-bg:#e8f5ea; --ok-fg:#1f6b33; --ok-border:#bfe3c6;
+  --chip-bg:#eceae3;
+  --mono-bg:#1c1b19; --mono-fg:#e7e4da;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171a; --surface:#1d2024; --surface-2:#242830; --fg:#eceae3; --fg-muted:#9a9c9e;
+    --accent:#36d6c9; --accent-ink:#0b1413; --border:#33373d;
+    --warn-bg:#2c2415; --warn-fg:#e3b659; --warn-border:#4a3b1c;
+    --ok-bg:#15271c; --ok-fg:#7fd99a; --ok-border:#275a3a;
+    --chip-bg:#242830;
+    --mono-bg:#0d0f11; --mono-fg:#d9d6cc;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--fg); margin:0; font-family:"Source Sans 3", system-ui, sans-serif; line-height:1.55; padding:0 16px;}
+.envoltura{max-width:720px; margin:0 auto; padding-block:48px 80px;}
+h1,h2,h3{font-family:"Fraunces", Georgia, serif; text-wrap:balance; font-weight:600; letter-spacing:-0.01em;}
+h1{font-size:clamp(28px,6vw,40px); margin:0 0 6px;}
+.subtitulo{color:var(--fg-muted); font-size:17px; margin:0 0 40px; max-width:46ch;}
+h2{font-size:22px; margin:0 0 4px;}
+h3{font-size:16px; margin:0 0 8px; font-weight:600;}
+p{margin:0 0 14px;}
+.etiqueta-seccion{display:flex; align-items:baseline; gap:10px; margin:56px 0 18px;}
+.etiqueta-seccion .num{font-family:"IBM Plex Mono", monospace; font-size:13px; color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:2px 9px; flex-shrink:0;}
+.etiqueta-seccion hr{flex:1; border:none; border-top:1px solid var(--border); margin:0;}
+code, .mono{font-family:"IBM Plex Mono", monospace; font-size:.92em;}
+.checklist{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 22px; margin:0 0 16px;}
+.checklist ul{list-style:none; margin:0; padding:0; display:grid; gap:10px;}
+.checklist li{display:flex; gap:10px; align-items:flex-start;}
+.checklist li::before{content:""; width:18px; height:18px; border-radius:5px; border:2px solid var(--accent); flex-shrink:0; margin-top:2px;}
+.paso{display:flex; gap:16px; margin:0 0 26px;}
+.paso .burbuja{width:30px; height:30px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; font-family:"IBM Plex Mono", monospace;}
+.paso .contenido{min-width:0; flex:1; padding-top:2px;}
+.paso .contenido p:last-child{margin-bottom:0;}
+.mockup{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; margin:4px 0 18px; position:relative;}
+.mockup .titulo-mockup{font-family:"IBM Plex Mono", monospace; font-size:11.5px; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px;}
+.campo{margin-bottom:10px; min-width:0;}
+.campo label{display:block; font-size:12.5px; color:var(--fg-muted); margin-bottom:4px;}
+.campo .caja{background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px; font-size:13.5px; font-family:"IBM Plex Mono", monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.fila-campos{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.boton-mock{display:inline-block; background:var(--accent); color:var(--accent-ink); border-radius:8px; padding:9px 16px; font-size:13.5px; font-weight:600; margin-top:4px; margin-right:8px;}
+.boton-mock.secundario{background:transparent; color:var(--fg); border:1px solid var(--border);}
+.marca-llamada{position:absolute; width:26px; height:26px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font-family:"IBM Plex Mono", monospace; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; transform:translate(-50%,-50%); box-shadow:0 0 0 3px var(--surface);}
+figure{margin:8px 0 20px;}
+figcaption{font-size:13px; color:var(--fg-muted); margin-top:8px; text-align:center;}
+svg{width:100%; height:auto; display:block;}
+.nota{border-left:3px solid var(--border); padding:4px 0 4px 14px; color:var(--fg-muted); font-size:14.5px; margin:0 0 16px;}
+.aviso{background:var(--warn-bg); color:var(--warn-fg); border:1px solid var(--warn-border); border-radius:12px; padding:14px 16px; margin:0 0 18px; font-size:14.5px;}
+.aviso strong{display:block; margin-bottom:4px; font-family:"IBM Plex Mono", monospace; font-size:12px; text-transform:uppercase; letter-spacing:.05em;}
+.exito{background:var(--ok-bg); color:var(--ok-fg); border:1px solid var(--ok-border); border-radius:12px; padding:14px 16px; margin:0 0 18px; font-size:14.5px;}
+.chip{display:inline-block; background:var(--chip-bg); border-radius:999px; padding:3px 11px; font-size:12.5px; font-family:"IBM Plex Mono", monospace; margin:0 4px 4px 0;}
+table{width:100%; border-collapse:collapse; margin:0 0 20px; font-size:14px;}
+th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top;}
+th{color:var(--fg-muted); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em;}
+.indice{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 44px;}
+.indice a{font-size:13px; color:var(--fg-muted); text-decoration:none; border:1px solid var(--border); border-radius:999px; padding:5px 12px;}
+.tabla-mock{width:100%; border-collapse:collapse; margin:10px 0; font-family:"IBM Plex Mono", monospace; font-size:12px;}
+.tabla-mock th{background:var(--surface-2); text-align:left; padding:7px 9px; font-weight:600;}
+.tabla-mock td{padding:7px 9px; border-bottom:1px solid var(--border);}
+.registro-mock{background:var(--mono-bg); color:var(--mono-fg); border-radius:8px; padding:12px 14px; font-family:"IBM Plex Mono", monospace; font-size:12px; line-height:1.7; margin-top:10px;}
+.registro-mock .ok{color:#7fd99a;}
+.plantilla{background:var(--mono-bg); border-radius:10px; padding:4px 4px 4px 14px; margin:0 0 14px; display:flex; align-items:center; gap:10px;}
+.plantilla code{color:var(--mono-fg); flex:1; min-width:0; overflow-x:auto; white-space:pre; padding:10px 0;}
+.plantilla button{flex-shrink:0; background:var(--accent); color:var(--accent-ink); border:none; border-radius:7px; padding:9px 14px; font-size:13px; font-weight:600; font-family:"Source Sans 3",sans-serif; cursor:pointer;}
+.plantilla button:active{transform:scale(0.97);}
+.plantilla-titulo{font-size:13.5px; color:var(--fg-muted); margin:0 0 6px;}
+footer{margin-top:60px; padding-top:20px; border-top:1px solid var(--border); color:var(--fg-muted); font-size:13px;}
+footer a{color:var(--accent);}
+@media print{ body{background:#fff; color:#000;} .mockup,.registro-mock,.plantilla{break-inside:avoid;} }
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+<p class="chip">Manual 1 de 2</p>
+<h1>Conectar tus cámaras</h1>
+<p class="subtitulo">Guía paso a paso para dar de alta cualquier cámara o grabador en el sistema — sin necesitar experiencia previa con videovigilancia.</p>
+
+<nav class="indice">
+  <a href="#antes">Antes de empezar</a>
+  <a href="#una-camara">Una cámara IP o WiFi</a>
+  <a href="#dvr-nvr">Un DVR/NVR completo</a>
+  <a href="#usb">Webcam / USB</a>
+  <a href="#problemas">Si algo no conecta</a>
+  <a href="#plantillas">Plantillas de URL</a>
+</nav>
+
+<div id="antes"></div>
+<div class="etiqueta-seccion"><span class="num">0</span><hr></div>
+<h2>Antes de empezar</h2>
+<p>Reúne estos tres datos — te los da quien instaló la cámara, o la etiqueta/caja del equipo:</p>
+<div class="checklist">
+  <ul>
+    <li><strong>La IP de la cámara o del grabador</strong> (ej. <code>192.168.1.64</code>) — un número como ese, siempre son 4 grupos de números.</li>
+    <li><strong>Usuario y clave</strong> de la cámara (casi siempre <code>admin</code> + la clave que se puso al instalarla).</li>
+    <li><strong>Que la computadora esté en la misma red</strong> que la cámara — WiFi o cable, no importa cuál, pero la misma red.</li>
+  </ul>
+</div>
+<p class="nota">Si no tienes alguno de estos tres datos, consíguelos antes de seguir: sin ellos ninguna cámara va a conectar, sin importar lo demás que hagas bien.</p>
+
+<div id="una-camara"></div>
+<div class="etiqueta-seccion"><span class="num">1</span><hr></div>
+<h2>Agregar una cámara IP o WiFi (una por una)</h2>
+<p>Usa este camino cuando tengas <strong>una</strong> cámara suelta — IP, WiFi, o una ya conectada a un DVR de la que solo quieres este canal. Si tienes un grabador con varios canales, salta a la sección 2: ahí los agrega todos de una vez.</p>
+
+<div class="paso">
+  <div class="burbuja">1</div>
+  <div class="contenido">
+    <p>En el menú de la izquierda, entra a <strong>"Cámaras"</strong>.</p>
+  </div>
+</div>
+
+<div class="paso">
+  <div class="burbuja">2</div>
+  <div class="contenido">
+    <p>Completa <code>Zona</code> (el nombre del lugar que vigila, ej. "Patio") y <code>Nombre</code> (como quieres llamarla, ej. "Cam-Patio-01"). Elige su <code>Marca</code>.</p>
+  </div>
+</div>
+
+<figure class="mockup" style="position:relative; margin-top:-6px;">
+  <div class="titulo-mockup">Pestaña "Cámaras" — Agregar cámara</div>
+  <div class="fila-campos">
+    <div class="campo"><label>Zona</label><div class="caja">Patio</div></div>
+    <div class="campo"><label>Nombre</label><div class="caja">Cam-Patio-01</div></div>
+  </div>
+  <div class="fila-campos">
+    <div class="campo"><label>Marca</label><div class="caja">Hikvision ▾</div></div>
+    <div class="campo"><label>Conexion</label><div class="caja">RTSP ▾</div></div>
+  </div>
+  <div class="campo"><label>IP del DVR/camara</label><div class="caja">192.168.1.64</div></div>
+  <div class="fila-campos">
+    <div class="campo"><label>Usuario</label><div class="caja">admin</div></div>
+    <div class="campo"><label>Clave</label><div class="caja">••••••••</div></div>
+  </div>
+  <div class="campo"><label>URL RTSP / indice USB (se arma sola)</label><div class="caja">rtsp://admin:•••@192.168.1.64:554/Streaming/Channels/101</div></div>
+  <span class="boton-mock secundario">Probar conexion</span>
+  <span class="boton-mock">Agregar camara</span>
+  <span class="marca-llamada" style="top:168px; left:18px;">3</span>
+  <span class="marca-llamada" style="top:168px; right:18px;">4</span>
+  <span class="marca-llamada" style="bottom:46px; left:132px;">5</span>
+</figure>
+
+<div class="paso">
+  <div class="burbuja">3</div>
+  <div class="contenido">
+    <p>Si la marca es <strong>Hikvision o Dahua</strong>, aparece un "Asistente de conexión al DVR": escribe ahí la IP, usuario, clave y canal — <strong>la URL de abajo se arma sola</strong>, no hace falta escribirla ni saber su formato.</p>
+  </div>
+</div>
+
+<div class="paso">
+  <div class="burbuja">4</div>
+  <div class="contenido">
+    <p>Pulsa <strong>"Probar conexión"</strong> antes de agregarla. En unos segundos te dice si conectó o qué falló — así corriges el dato equivocado ahí mismo, sin ensuciar la lista con intentos fallidos.</p>
+  </div>
+</div>
+
+<div class="exito"><strong>Si dice "Conexión exitosa"</strong> ya puedes pulsar "Agregar cámara": aparece de inmediato en el Centro de Monitoreo, sin reiniciar el programa.</div>
+
+<div class="paso">
+  <div class="burbuja">5</div>
+  <div class="contenido">
+    <p>¿La cámara tiene motor y se puede mover (sube/baja/gira)? Marca la casilla <strong>"Esta cámara tiene motor PTZ"</strong>. Si no estás seguro, déjala sin marcar — no afecta nada más, solo habilita los comandos de mover la cámara.</p>
+  </div>
+</div>
+
+<div id="dvr-nvr"></div>
+<div class="etiqueta-seccion"><span class="num">2</span><hr></div>
+<h2>Agregar un DVR o NVR completo (todos sus canales a la vez)</h2>
+<p><strong>DVR</strong> = grabador para cámaras <em>analógicas</em>. <strong>NVR</strong> = grabador para cámaras <em>IP</em>. En ambos casos es una sola caja con varios canales, cada uno con su propia cámara conectada por cable.</p>
+
+<figure>
+  <svg viewBox="0 0 640 190" role="img" aria-label="El DVR/NVR se conecta por cable a sus cámaras y por red (cable o WiFi) al mismo router que la computadora; la app habla con el grabador por esa red, no directo con cada cámara.">
+    <defs>
+      <marker id="fl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+    </defs>
+    <g fill="none" stroke="currentColor" stroke-width="1.6">
+      <rect x="16" y="26" width="112" height="60" rx="8"/>
+      <rect x="16" y="104" width="112" height="60" rx="8"/>
+      <rect x="264" y="60" width="110" height="64" rx="8"/>
+      <rect x="494" y="60" width="130" height="64" rx="8"/>
+    </g>
+    <text x="72" y="52" text-anchor="middle" font-size="12">Cámara</text>
+    <text x="72" y="66" text-anchor="middle" font-size="12">canal 1</text>
+    <text x="72" y="130" text-anchor="middle" font-size="12">Cámara</text>
+    <text x="72" y="144" text-anchor="middle" font-size="12">canal 2...N</text>
+    <text x="319" y="86" text-anchor="middle" font-size="13" font-weight="600">DVR / NVR</text>
+    <text x="319" y="102" text-anchor="middle" font-size="11">192.168.1.64</text>
+    <text x="559" y="90" text-anchor="middle" font-size="13" font-weight="600">Esta PC</text>
+    <text x="559" y="106" text-anchor="middle" font-size="11">pestaña "NVR / DVR"</text>
+    <line x1="128" y1="56" x2="264" y2="78" stroke="currentColor" stroke-width="1.6" marker-end="url(#fl)"/>
+    <line x1="128" y1="134" x2="264" y2="104" stroke="currentColor" stroke-width="1.6" marker-end="url(#fl)"/>
+    <line x1="374" y1="92" x2="494" y2="92" stroke="currentColor" stroke-width="1.6" marker-end="url(#fl)"/>
+    <text x="434" y="80" text-anchor="middle" font-size="11">red local (WiFi o cable)</text>
+    <text x="434" y="112" text-anchor="middle" font-size="10" opacity="0.75">puerto 554, RTSP</text>
+    <text x="196" y="68" text-anchor="middle" font-size="10" opacity="0.75">cable</text>
+    <text x="196" y="112" text-anchor="middle" font-size="10" opacity="0.75">cable</text>
+  </svg>
+  <figcaption>Las cámaras se cablean al grabador, no a la computadora; la computadora solo necesita estar en la misma red que el grabador — por WiFi o por cable, cualquiera sirve.</figcaption>
+</figure>
+
+<div class="paso">
+  <div class="burbuja">1</div>
+  <div class="contenido"><p>Entra a <strong>"NVR / DVR"</strong> en el menú de la izquierda.</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">2</div>
+  <div class="contenido"><p>Completa el formulario <strong>una sola vez</strong>: nombre del grabador, marca, IP, usuario, clave, y <strong>cuántos canales tiene</strong> (lo dice la caja del equipo, o cuenta cuántas cámaras tiene cableadas).</p></div>
+</div>
+
+<figure class="mockup" style="position:relative;">
+  <div class="titulo-mockup">Pestaña "NVR / DVR" — Registrar un DVR/NVR nuevo</div>
+  <div class="campo"><label>Nombre</label><div class="caja">DVR Patio Central</div></div>
+  <div class="fila-campos">
+    <div class="campo"><label>Marca</label><div class="caja">Hikvision ▾</div></div>
+    <div class="campo"><label>IP del grabador</label><div class="caja">192.168.1.64</div></div>
+  </div>
+  <div class="fila-campos">
+    <div class="campo"><label>Usuario</label><div class="caja">admin</div></div>
+    <div class="campo"><label>Clave</label><div class="caja">••••••••</div></div>
+  </div>
+  <div class="campo"><label>Cantidad de canales</label><div class="caja">8</div></div>
+  <span class="boton-mock" style="margin-top:6px;">Registrar y detectar todos los canales</span>
+  <span class="marca-llamada" style="top:154px; left:70px;">3</span>
+</figure>
+
+<div class="paso">
+  <div class="burbuja">3</div>
+  <div class="contenido">
+    <p>Pulsa <strong>"Registrar y detectar todos los canales"</strong>. El sistema prueba canal por canal (verás "Probando canal 3 de 8..."); cada canal que responda se agrega solo, con su propia cámara visible de inmediato en el Centro de Monitoreo.</p>
+  </div>
+</div>
+
+<div class="exito"><strong>Resultado esperado:</strong> en el registro de abajo aparece una línea por cada canal — <span class="mono">"Canal 1: conectado (1920x1080), agregado como zona..."</span>. Si un canal no respondió, no pasa nada: puedes agregarlo después con "Detectar canales nuevos".</div>
+
+<figure class="mockup">
+  <div class="titulo-mockup">Así se ve despues — pestaña "NVR / DVR"</div>
+  <table class="tabla-mock">
+    <tr><th>ID</th><th>Nombre</th><th>Marca</th><th>IP</th><th>Canales</th><th>Cámaras activas</th></tr>
+    <tr><td>1</td><td>DVR Patio Central</td><td>Hikvision</td><td>192.168.1.64</td><td>8</td><td>6</td></tr>
+  </table>
+  <div class="registro-mock">
+    [DVR Patio Central] Grabador registrado. Probando sus 8 canales...<br>
+    [DVR Patio Central] Canal 1: <span class="ok">conectado</span> (1920x1080), agregado como zona "DVR Patio Central Canal 1".<br>
+    [DVR Patio Central] Canal 2: <span class="ok">conectado</span> (1920x1080), agregado como zona "DVR Patio Central Canal 2".<br>
+    [DVR Patio Central] Canal 5: sin respuesta (no se agregó).
+  </div>
+</figure>
+
+<table>
+  <tr><th>Si quieres...</th><th>Usa este botón</th></tr>
+  <tr><td>Conectaste cámaras nuevas al mismo grabador</td><td><span class="chip">Detectar canales nuevos</span> (no duplica las que ya tiene)</td></tr>
+  <tr><td>Quitar el grabador y todas sus cámaras de una vez</td><td><span class="chip">Quitar grabador y sus camaras</span> (solo Administrador)</td></tr>
+</table>
+
+<div id="usb"></div>
+<div class="etiqueta-seccion"><span class="num">3</span><hr></div>
+<h2>Cámara integrada o webcam USB</h2>
+<div class="paso">
+  <div class="burbuja">1</div>
+  <div class="contenido"><p>En "Cámaras", elige conexión <strong>USB</strong> en vez de RTSP.</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">2</div>
+  <div class="contenido">
+    <p>Pulsa <strong>"Detectar cámaras USB disponibles"</strong>: no todas las laptops usan el mismo número para su webcam, así que el sistema las prueba todas y te deja elegir de una lista (ej. "Índice 0 (1280x720)").</p>
+  </div>
+</div>
+
+<div id="problemas"></div>
+<div class="etiqueta-seccion"><span class="num">4</span><hr></div>
+<h2>Si "Probar conexión" falla</h2>
+<table>
+  <tr><th>Mensaje</th><th>Qué revisar</th></tr>
+  <tr><td>No se pudo conectar</td><td>La IP, el usuario o la clave están mal — o la PC no está en la misma red que la cámara/grabador.</td></tr>
+  <tr><td>Conectó pero no llegó ninguna imagen</td><td>El número de canal no existe en ese grabador (ej. pediste canal 9 en un grabador de 4).</td></tr>
+  <tr><td>No respondió ningún canal</td><td>Revisa la IP del grabador primero — si esa está mal, ningún canal va a responder.</td></tr>
+</table>
+<div class="aviso"><strong>Tip rápido</strong>Si tienes dudas de si una URL funciona, pruébala primero en VLC (Abrir ubicación de red) con la misma IP/usuario/clave: si VLC la ve, el programa también la va a ver.</div>
+
+<div id="plantillas"></div>
+<div class="etiqueta-seccion"><span class="num">5</span><hr></div>
+<h2>Plantillas de URL para escribir a mano</h2>
+<p>El asistente arma la URL solo para Hikvision y Dahua. Para <strong>Tapo, "Genérico" u otra marca IP</strong>, copia la plantilla que corresponda, pégala en el campo <code>URL RTSP / indice USB</code> de la app, y reemplaza <code>usuario</code>, <code>contraseña</code> e <code>IP</code> por los datos reales de tu cámara.</p>
+
+<p class="plantilla-titulo">Genérica (la mayoría de cámaras IP)</p>
+<div class="plantilla">
+  <code id="pl1">rtsp://usuario:contraseña@IP:554/stream1</code>
+  <button onclick="copiarTexto('pl1', this)">Copiar</button>
+</div>
+
+<p class="plantilla-titulo">TP-Link Tapo</p>
+<div class="plantilla">
+  <code id="pl2">rtsp://usuario:contraseña@IP:554/stream1</code>
+  <button onclick="copiarTexto('pl2', this)">Copiar</button>
+</div>
+
+<p class="plantilla-titulo">Hikvision (canal 1, calidad principal) — por si el asistente no está disponible</p>
+<div class="plantilla">
+  <code id="pl3">rtsp://usuario:contraseña@IP:554/Streaming/Channels/101</code>
+  <button onclick="copiarTexto('pl3', this)">Copiar</button>
+</div>
+
+<p class="plantilla-titulo">Dahua (canal 1, calidad principal)</p>
+<div class="plantilla">
+  <code id="pl4">rtsp://usuario:contraseña@IP:554/cam/realmonitor?channel=1&amp;subtype=0</code>
+  <button onclick="copiarTexto('pl4', this)">Copiar</button>
+</div>
+
+<div class="nota">El usuario de Tapo para RTSP no es el de la app de celular: se crea aparte en la app Tapo, en "Configuración de la cámara → Cuenta de cámara".</div>
+
+<footer>Manual 1 de 2 — Conectar tus cámaras. El manual de comandos de voz se abre desde el mismo menú "Manuales" del programa.</footer>
+</div>
+
+<script>
+function copiarTexto(id, boton){
+  var texto = document.getElementById(id).textContent;
+  var textoOriginal = boton.textContent;
+  function marcarCopiado(){
+    boton.textContent = "¡Copiado!";
+    setTimeout(function(){ boton.textContent = textoOriginal; }, 1500);
+  }
+  try{
+    navigator.clipboard.writeText(texto).then(marcarCopiado, function(){
+      seleccionarComoRespaldo(id, marcarCopiado);
+    });
+  }catch(e){
+    seleccionarComoRespaldo(id, marcarCopiado);
+  }
+}
+function seleccionarComoRespaldo(id, alHacerlo){
+  var el = document.getElementById(id);
+  var rango = document.createRange();
+  rango.selectNodeContents(el);
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(rango);
+  alHacerlo();
+}
+</script>
+</body>
+</html>

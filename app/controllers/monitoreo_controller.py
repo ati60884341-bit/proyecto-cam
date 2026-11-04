@@ -10,9 +10,9 @@ from app.models import zona_model, incidencia_model, evidencia_model, fatiga_mod
 from app.services.camera_service import CamaraThread
 from app.services.hash_service import firmar_archivo
 from app.services.fatiga_service import AuditorFatiga
-from app.services.voice_service import AsistenteVozThread, interpretar_comando, hablar, registrar_zona
+from app.services.voice_service import AsistenteVozThread, interpretar_comando, hablar, registrar_zona, normalizar
 from app.services.panic_service import DetectorPanicoThread
-from app.services.ptz_service import MovimientoPTZThread
+from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread
 from app.services import telegram_service
 from app.views.UI.zona_ampliada_dialog import ZonaAmpliadaDialog
 
@@ -37,7 +37,11 @@ class MonitoreoController:
         self.hilos_camara = {}
         self.dialogos_ampliados = {}
         self.factor_zoom = {}
-        self.hilo_ptz = None
+        # lista, no una sola variable: si se mueven dos camaras (zonas
+        # distintas) casi al mismo tiempo, una sola variable pierde la
+        # referencia a la primera mientras todavia esta corriendo (riesgo
+        # de que Python la recolecte a mitad de la llamada ONVIF)
+        self._hilos_ptz_activos = []
 
         self._puente_telegram = _PuenteTelegram()
         self._puente_telegram.resultado.connect(
@@ -55,6 +59,7 @@ class MonitoreoController:
 
         self.hilo_voz = None
         self.detector_panico = None
+        self._gesto_activando = False
 
         # cola de arranque: iniciar dos o mas hilos que cargan librerias
         # nativas pesadas (FFmpeg de cada camara) al mismo tiempo resulto
@@ -75,6 +80,16 @@ class MonitoreoController:
         self.fatiga.fatiga_detectada.connect(self._fatiga_detectada)
         self.fatiga.confirmado.connect(self._fatiga_confirmada_ok)
         self.fatiga.iniciar()
+
+        self._actualizar_manual_ptz()
+
+    def _actualizar_manual_ptz(self):
+        """El manual de comandos (boton "Ver manual de comandos") solo debe
+        ofrecer mover/presets en las zonas que de verdad tienen una camara
+        con motor PTZ marcado ahora mismo - se recalcula cada vez que una
+        camara se agrega o se quita."""
+        zonas_con_ptz = sorted(z for z, c in self.camaras_por_zona.items() if c.get("TienePTZ"))
+        self.view.actualizar_disponibilidad_ptz(zonas_con_ptz)
 
     # margenes entre arranques de hilos nativos (ver _programar_arranque_nativo):
     # se eligieron observando cuanto tarda cada uno en terminar de verdad, no
@@ -103,11 +118,19 @@ class MonitoreoController:
 
     def _alternar_deteccion_gesto(self, activar):
         if activar:
-            if self.detector_panico is not None:
-                return  # ya esta activa (o activandose)
+            if self.detector_panico is not None or self._gesto_activando:
+                return  # ya esta activa, o ya se programo su arranque
+            # el arranque real queda programado con un retraso (paso_seg),
+            # asi que self.detector_panico sigue en None hasta que de verdad
+            # arranca: esta bandera es la que de verdad marca "ya pedido",
+            # para no programar dos arranques si se alterna rapido el
+            # checkbox (eso terminaba creando dos detectores de mediapipe a
+            # la vez sobre la misma camara, uno de ellos huerfano)
+            self._gesto_activando = True
             self.view.lbl_estado_gesto.setText("Deteccion de gesto: activando...")
             self._programar_arranque_nativo(self._iniciar_detector_panico, paso_seg=self.PASO_ARRANQUE_PANICO_SEG)
         else:
+            self._gesto_activando = False  # cancela el arranque si aun no se habia disparado
             if self.detector_panico is None:
                 return
             if "Ingreso" in self.hilos_camara:
@@ -121,6 +144,9 @@ class MonitoreoController:
             self.view.lbl_estado_gesto.setText("Deteccion de gesto: desactivada")
 
     def _iniciar_detector_panico(self):
+        if not self._gesto_activando:
+            return  # el usuario lo desactivo antes de que le tocara arrancar
+        self._gesto_activando = False
         self.detector_panico = DetectorPanicoThread()
         self.detector_panico.gesto_detectado.connect(self.activar_panico)
         self.detector_panico.no_disponible.connect(
@@ -176,6 +202,7 @@ class MonitoreoController:
         self.view.agregar_zona_frame(camara)
         self._programar_arranque_nativo(lambda c=camara: self._iniciar_hilo_camara(c))
         registrar_zona(zona)
+        self._actualizar_manual_ptz()
         self.view.registrar_evento(
             f"[CAMARA] Nueva camara en {zona}: {camara['Nombre']} ({camara['Marca']}, {camara['TipoConexion']})."
         )
@@ -189,6 +216,7 @@ class MonitoreoController:
             hilo.wait(1500)
         self.camaras_por_zona.pop(zona, None)
         self.view.marcar_zona_removida(zona)
+        self._actualizar_manual_ptz()
         self.view.registrar_evento(f"[CAMARA] Camara de {zona} quitada por el administrador.")
 
     def reconectar_camara(self, zona):
@@ -309,8 +337,8 @@ class MonitoreoController:
 
     # ---------------- comandos (voz / manual) ----------------
     def _procesar_comando_manual(self, texto):
-        accion, zona, _ = interpretar_comando(texto)
-        resultado = self._ejecutar_comando(accion, zona)
+        accion, zona, _, numero_preset = interpretar_comando(texto)
+        resultado = self._ejecutar_comando(accion, zona, numero_preset)
         comando_model.registrar(self.usuario["IdUsuario"], texto, resultado)
         self.view.registrar_evento(f"[COMANDO] \"{texto}\" -> {resultado}")
 
@@ -318,7 +346,7 @@ class MonitoreoController:
         if activar:
             if self.hilo_voz and self.hilo_voz.isRunning():
                 return
-            self.hilo_voz = AsistenteVozThread()
+            self.hilo_voz = AsistenteVozThread(device_index=self.view.microfono_seleccionado())
             self.hilo_voz.comando_reconocido.connect(self._on_comando_voz_reconocido)
             self.hilo_voz.error_reconocimiento.connect(
                 lambda msg: self.view.lbl_estado_voz.setText(f"Asistente: {msg}")
@@ -336,14 +364,27 @@ class MonitoreoController:
                 self.hilo_voz = None
             self.view.lbl_estado_voz.setText("Asistente apagado")
 
-    def _on_comando_voz_reconocido(self, accion, zona, texto):
-        resultado = self._ejecutar_comando(accion, zona)
+    def _on_comando_voz_reconocido(self, accion, zona, texto, numero_preset):
+        resultado = self._ejecutar_comando(accion, zona, numero_preset)
         comando_model.registrar(self.usuario["IdUsuario"], texto, resultado)
         self.view.registrar_evento(f"[VOZ] \"{texto}\" -> {resultado}")
         threading.Thread(target=hablar, args=(resultado,), daemon=True).start()
 
-    def _ejecutar_comando(self, accion, zona):
-        zona_nombre = zona.capitalize() if zona else None
+    def _resolver_zona(self, zona_dicha):
+        """zona_dicha ya viene normalizada (minusculas, sin tildes) desde
+        voice_service.interpretar_comando(). Las zonas reales (claves de
+        self.camaras_por_zona/self.hilos_camara) guardan su capitalizacion
+        original tal cual quedo en la base de datos - "Ingreso", pero
+        tambien "DVR Patio Central Canal 1" para los canales de un
+        grabador. Un simple .capitalize() solo funciona con zonas de una
+        palabra; esto compara normalizado contra el nombre real y punto."""
+        if not zona_dicha:
+            return None
+        objetivo = normalizar(zona_dicha)
+        return next((z for z in self.camaras_por_zona if normalizar(z) == objetivo), None)
+
+    def _ejecutar_comando(self, accion, zona, numero_preset=None):
+        zona_nombre = self._resolver_zona(zona)
         if accion == "ampliar" and zona_nombre in self.hilos_camara:
             self.ampliar_zona(zona_nombre)
             return f"Ampliando {zona_nombre}"
@@ -359,6 +400,10 @@ class MonitoreoController:
         if accion.startswith("mover_"):
             direccion = accion.split("_", 1)[1]
             return self._mover_camara(zona_nombre, direccion)
+        if accion in ("preset_guardar", "preset_ir"):
+            if numero_preset is None:
+                return "Indique el numero de preset (ej. \"patio preset 1\")"
+            return self._usar_preset_camara(zona_nombre, numero_preset, accion.split("_", 1)[1])
         if accion == "vista_general":
             return "Mostrando vista general de las zonas"
         return "Comando no reconocido"
@@ -369,13 +414,38 @@ class MonitoreoController:
             return "Indique una zona valida para mover la camara"
         if camara["TipoConexion"] != "RTSP":
             return f"La camara de {zona} no soporta movimiento PTZ (es USB)"
+        if not camara.get("TienePTZ"):
+            # capacidad declarada POR CAMARA al agregarla (pestana Camaras o
+            # NVR/DVR), no asumida por marca: evita intentar ONVIF (y
+            # esperar su timeout) en una camara que de entrada no tiene
+            # motor, y da un mensaje claro en vez de un error tecnico
+            return f"La camara de {zona} no tiene motor PTZ (no se marco al agregarla)"
 
         hilo = MovimientoPTZThread(camara["UrlConexion"], camara["Marca"], direccion)
         hilo.resultado.connect(lambda ok, mensaje, z=zona: self._on_resultado_ptz(ok, mensaje, z))
+        hilo.finished.connect(lambda h=hilo: self._hilos_ptz_activos.remove(h))
         hilo.finished.connect(hilo.deleteLater)
-        self.hilo_ptz = hilo  # evita que se recolecte mientras corre
+        self._hilos_ptz_activos.append(hilo)  # evita que se recolecte mientras corre
         hilo.start()
         return f"Moviendo camara de {zona} hacia {direccion}..."
+
+    def _usar_preset_camara(self, zona, numero_preset, accion_preset):
+        camara = self.camaras_por_zona.get(zona)
+        if not camara:
+            return "Indique una zona valida para usar un preset PTZ"
+        if camara["TipoConexion"] != "RTSP":
+            return f"La camara de {zona} no soporta presets PTZ (es USB)"
+        if not camara.get("TienePTZ"):
+            return f"La camara de {zona} no tiene motor PTZ (no se marco al agregarla)"
+
+        hilo = PresetPTZThread(camara["UrlConexion"], camara["Marca"], numero_preset, accion_preset)
+        hilo.resultado.connect(lambda ok, mensaje, z=zona: self._on_resultado_ptz(ok, mensaje, z))
+        hilo.finished.connect(lambda h=hilo: self._hilos_ptz_activos.remove(h))
+        hilo.finished.connect(hilo.deleteLater)
+        self._hilos_ptz_activos.append(hilo)  # evita que se recolecte mientras corre
+        hilo.start()
+        verbo = "Guardando posicion como" if accion_preset == "guardar" else "Yendo al"
+        return f"{verbo} preset {numero_preset} en {zona}..."
 
     def _on_resultado_ptz(self, ok, mensaje, zona):
         self.view.registrar_evento(f"{'[PTZ]' if ok else '[PTZ-ERROR]'} {mensaje}")

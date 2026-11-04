@@ -1,32 +1,13 @@
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit,
-    QComboBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
+    QComboBox, QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
 )
 
+from app.services.dvr_urls import construir_url_canal, MARCAS_CON_ASISTENTE_DVR
+
 MARCAS = ["Hikvision", "Dahua", "Tapo", "WebcamUSB", "Generico"]
-COLUMNAS = ["ID", "Zona", "Nombre", "Marca", "Conexion", "URL / Indice", "Estado"]
-
-# Marcas de DVR/NVR cuya URL RTSP se puede armar sola a partir de
-# IP + usuario + clave + canal, para que quien instala en el local no tenga
-# que escribir ni recordar el formato exacto de la URL.
-MARCAS_CON_ASISTENTE_DVR = ("Hikvision", "Dahua")
-
-
-def _construir_url_dvr(marca, ip, puerto, usuario, clave, canal, flujo_principal):
-    if not ip:
-        return ""
-    puerto = puerto or "554"
-    canal = canal or "1"
-    usuario = usuario or "admin"
-    if marca == "Hikvision":
-        # canal 1 principal -> 101, canal 1 secundario -> 102, canal 2 -> 201/202, etc.
-        sub = "01" if flujo_principal else "02"
-        return f"rtsp://{usuario}:{clave}@{ip}:{puerto}/Streaming/Channels/{canal}{sub}"
-    if marca == "Dahua":
-        subtype = "0" if flujo_principal else "1"
-        return f"rtsp://{usuario}:{clave}@{ip}:{puerto}/cam/realmonitor?channel={canal}&subtype={subtype}"
-    return ""
+COLUMNAS = ["ID", "Zona", "Nombre", "Marca", "Conexion", "URL / Indice", "Estado", "PTZ"]
 
 
 class CamarasView(QWidget):
@@ -93,6 +74,15 @@ class CamarasView(QWidget):
         self.campo_flujo.addItems(["Principal (mejor calidad)", "Secundario (mas liviano)"])
         formulario_asistente.addRow("Calidad de video:", self.campo_flujo)
 
+        aviso_multicanal = QLabel(
+            "¿Este grabador tiene MAS de una cámara/canal? Use la pestaña \"NVR / DVR\"\n"
+            "en vez de esto: registra el grabador una sola vez y agrega todos sus\n"
+            "canales de un tirón. Use este asistente solo para una cámara suelta."
+        )
+        aviso_multicanal.setStyleSheet("color: #aaa; font-size: 11px;")
+        aviso_multicanal.setWordWrap(True)
+        formulario_asistente.addRow(aviso_multicanal)
+
         for campo in (self.campo_ip, self.campo_puerto, self.campo_usuario_dvr, self.campo_clave_dvr, self.campo_canal):
             campo.textChanged.connect(self._actualizar_url_desde_asistente)
         self.campo_flujo.currentIndexChanged.connect(self._actualizar_url_desde_asistente)
@@ -117,6 +107,14 @@ class CamarasView(QWidget):
         self.fila_usb_widget = QWidget()
         self.fila_usb_widget.setLayout(fila_usb)
         formulario.addRow(self.fila_usb_widget)
+
+        self.chk_ptz = QCheckBox("Esta camara tiene motor PTZ (puede moverse: izq/der/arriba/abajo, con presets)")
+        self.chk_ptz.setToolTip(
+            "Marquelo solo si el modelo exacto tiene motor de movimiento. La mayoria de camaras\n"
+            "fijas/bullet NO lo tienen, incluso siendo de una marca que si vende domos PTZ.\n"
+            "Si no esta seguro, dejelo sin marcar: no afecta la deteccion de sabotaje ni el video."
+        )
+        formulario.addRow(self.chk_ptz)
 
         self._actualizar_placeholder_url("RTSP")
         self._actualizar_asistente_dvr()
@@ -205,7 +203,7 @@ class CamarasView(QWidget):
     def _actualizar_url_desde_asistente(self):
         if not self.grupo_asistente.isVisible():
             return
-        url = _construir_url_dvr(
+        url = construir_url_canal(
             self.campo_marca.currentText(),
             self.campo_ip.text().strip(),
             self.campo_puerto.text().strip(),
@@ -242,9 +240,11 @@ class CamarasView(QWidget):
             "marca": self.campo_marca.currentText(),
             "tipo_conexion": self.campo_tipo.currentText(),
             "url": url,
+            "tiene_ptz": self.chk_ptz.isChecked(),
         })
         self.campo_nombre.clear()
         self.campo_url.clear()
+        self.chk_ptz.setChecked(False)
 
     def _emitir_quitar(self):
         filas = self.tabla.selectionModel().selectedRows()
@@ -279,6 +279,7 @@ class CamarasView(QWidget):
             valores = [
                 c["IdCamara"], c["Zona"], c["Nombre"], c["Marca"],
                 c["TipoConexion"], c["UrlConexion"], c["Estado"],
+                "Si" if c.get("TienePTZ") else "No",
             ]
             for columna, valor in enumerate(valores):
                 self.tabla.setItem(fila, columna, QTableWidgetItem(str(valor)))
