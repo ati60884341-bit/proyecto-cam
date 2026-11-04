@@ -8,3 +8,7 @@ build/
 dist/
 build_log.txt
 installer_output/
+# .exe/.msi oficiales de Microsoft (VC++ Redistributable, ODBC Driver 18)
+# que installer.iss empaqueta en el instalador: pesan ~35 MB juntos y se
+# vuelven a bajar solos (ver el comentario al principio de installer.iss)
+prereqs/
