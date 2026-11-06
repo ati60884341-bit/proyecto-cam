@@ -1,5 +1,6 @@
 import os
 import socket
+import subprocess
 import threading
 import time
 from collections import deque
@@ -48,20 +49,68 @@ def _abrir_captura(tipo_conexion, url_conexion):
     return cap
 
 
-def _servidor_alcanzable(url_rtsp, timeout=2.0):
-    """Verificacion TCP rapida antes de invocar a FFmpeg: si el host:puerto no
-    responde en `timeout` segundos, no tiene sentido lanzar el intento de
-    apertura RTSP (que de otro modo puede tardar ~30s en fallar)."""
+def _puerto_abierto(host, puerto, timeout=2.0):
     try:
-        partes = urlparse(url_rtsp)
-        host = partes.hostname
-        if not host:
-            return True  # url no estandar: se deja intentar con cv2 igual
-        puerto = partes.port or 554
         with socket.create_connection((host, puerto), timeout=timeout):
             return True
     except OSError:
         return False
+
+
+def _servidor_alcanzable(url_rtsp, timeout=2.0):
+    """Verificacion TCP rapida antes de invocar a FFmpeg: si el host:puerto no
+    responde en `timeout` segundos, no tiene sentido lanzar el intento de
+    apertura RTSP (que de otro modo puede tardar ~30s en fallar)."""
+    partes = urlparse(url_rtsp)
+    host = partes.hostname
+    if not host:
+        return True  # url no estandar: se deja intentar con cv2 igual
+    puerto = partes.port or 554
+    return _puerto_abierto(host, puerto, timeout)
+
+
+def _hay_ruta_de_red(ip, timeout=1.5):
+    """Ping ICMP real al equipo (no solo su puerto RTSP): distingue "no hay
+    ruta de red hasta el" (cable/switch/subred) de "la red llega pero el
+    puerto no responde" (servicio apagado/credenciales). Usa el comando de
+    ping del sistema operativo en vez de una libreria nueva, siguiendo el
+    mismo criterio que el Radar de camaras (sin dependencias nuevas)."""
+    try:
+        if os.name == "nt":
+            comando = ["ping", "-n", "1", "-w", str(int(timeout * 1000)), ip]
+            flags = subprocess.CREATE_NO_WINDOW
+        else:
+            comando = ["ping", "-c", "1", "-W", str(max(1, int(timeout))), ip]
+            flags = 0
+        resultado = subprocess.run(
+            comando, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=timeout + 1, creationflags=flags,
+        )
+        return resultado.returncode == 0
+    except Exception:
+        return False
+
+
+def _diagnostico_red(host, puerto, timeout_ping=1.5, timeout_puerto=2.0):
+    """Cuando un DVR/camara no respondio, arma un mensaje que distingue EN QUE
+    CAPA se corto la conexion, para no dejar al tecnico en terreno con un
+    generico "revise la red":
+    1) ping ICMP: hay ruta de red hasta el equipo (cable/switch/misma subred)
+    2) puerto TCP: el equipo responde pero el servicio/puerto no
+    Devuelve None si en realidad el puerto ya responde (nada que explicar)."""
+    if _puerto_abierto(host, puerto, timeout_puerto):
+        return None
+    if not _hay_ruta_de_red(host, timeout_ping):
+        return (
+            f"Sin respuesta de red (ping) a {host}. Revise que el equipo este "
+            "encendido, el cable de red al switch/router, y que esta PC este en "
+            f"la misma red (misma subred) que {host}."
+        )
+    return (
+        f"La red llega a {host} pero el puerto {puerto} no responde. Revise que "
+        "el DVR/NVR tenga el servicio de video en red activo, el puerto "
+        "configurado, y que no haya un firewall bloqueandolo."
+    )
 
 
 def _abrir_captura_sin_bloqueo(tipo_conexion, url_conexion):
@@ -289,11 +338,7 @@ class PruebaConexionThread(QThread):
     def run(self):
         captura = _abrir_captura_sin_bloqueo(self.tipo_conexion, self.url_conexion)
         if not captura or not captura.isOpened():
-            self.resultado.emit(
-                False,
-                "No se pudo conectar. Revise IP, puerto, usuario/clave, el numero "
-                "de canal, y que esta PC este en la misma red que la camara/DVR.",
-            )
+            self.resultado.emit(False, self._mensaje_fallo_conexion())
             return
         try:
             for _ in range(15):  # hasta ~1.5s: algunas camaras tardan el primer fotograma
@@ -309,6 +354,22 @@ class PruebaConexionThread(QThread):
         finally:
             captura.release()
 
+    def _mensaje_fallo_conexion(self):
+        """Mensaje generico de siempre, salvo que se pueda precisar en que
+        capa de red se corto (ver _diagnostico_red): USB no tiene IP que
+        diagnosticar, asi que se queda con el generico."""
+        generico = (
+            "No se pudo conectar. Revise IP, puerto, usuario/clave, el numero "
+            "de canal, y que esta PC este en la misma red que la camara/DVR."
+        )
+        if self.tipo_conexion == "USB":
+            return generico
+        host = urlparse(self.url_conexion).hostname
+        if not host:
+            return generico
+        puerto = urlparse(self.url_conexion).port or 554
+        return _diagnostico_red(host, puerto) or generico
+
 
 class DeteccionCanalesDVRThread(QThread):
     """Prueba de una sola vez todos los canales de un DVR/NVR (Hikvision o
@@ -318,6 +379,7 @@ class DeteccionCanalesDVRThread(QThread):
 
     progreso = pyqtSignal(int, int)  # canal_actual, total
     resultado = pyqtSignal(list)  # [{"canal": int, "url": str, "resolucion": "WxH"}, ...]
+    diagnostico = pyqtSignal(str)  # detalle de red cuando resultado sale vacio (ver _diagnostico_red)
 
     def __init__(self, marca, ip, puerto, usuario, clave, cantidad_canales, canales_a_omitir=None, parent=None):
         super().__init__(parent)
@@ -339,6 +401,10 @@ class DeteccionCanalesDVRThread(QThread):
         # verificacion TCP (2s) canal por canal
         url_prueba = construir_url_canal(self.marca, self.ip, self.puerto, self.usuario, self.clave, 1, True)
         if not _servidor_alcanzable(url_prueba, timeout=3.0):
+            puerto = urlparse(url_prueba).port or 554
+            mensaje = _diagnostico_red(self.ip, puerto)
+            if mensaje:
+                self.diagnostico.emit(mensaje)
             self.resultado.emit([])
             return
 

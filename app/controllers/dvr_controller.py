@@ -23,6 +23,7 @@ class DvrController:
         self._programar_arranque_nativo = programar_arranque_nativo
         self._dispositivos = []
         self._hilo_deteccion = None
+        self._diagnostico_red = None
 
         self.view.registrar_solicitado.connect(self.registrar)
         self.view.detectar_nuevos_solicitado.connect(self.detectar_nuevos)
@@ -89,23 +90,32 @@ class DvrController:
         )
 
     def _ejecutar_deteccion(self, id_dispositivo, datos, canales_a_omitir):
+        self._diagnostico_red = None
         self._hilo_deteccion = DeteccionCanalesDVRThread(
             datos["marca"], datos["ip"], int(datos["puerto"]), datos["usuario"], datos["clave"],
             datos["cantidad_canales"], canales_a_omitir=canales_a_omitir,
         )
         self._hilo_deteccion.progreso.connect(self.view.actualizar_progreso)
+        self._hilo_deteccion.diagnostico.connect(self._guardar_diagnostico_red)
         self._hilo_deteccion.resultado.connect(
             lambda encontrados: self._procesar_canales_detectados(id_dispositivo, datos["nombre"], encontrados)
         )
         self._hilo_deteccion.start()
 
+    def _guardar_diagnostico_red(self, mensaje):
+        self._diagnostico_red = mensaje
+
     def _procesar_canales_detectados(self, id_dispositivo, nombre_dispositivo, encontrados):
         self.view.set_detectando(False)
         if not encontrados:
-            self.view.registrar_evento(
-                f"[{nombre_dispositivo}] No respondio ningun canal nuevo. Revise IP/usuario/clave, "
+            # _diagnostico_red precisa EN QUE CAPA se corto (sin ruta de red
+            # vs. puerto cerrado); si el host si respondio pero ningun canal
+            # dio imagen, el genérico de usuario/clave sigue siendo lo mas util
+            detalle = self._diagnostico_red or (
+                "No respondio ningun canal nuevo. Revise IP/usuario/clave, "
                 "y que esta PC este en la misma red que el grabador."
             )
+            self.view.registrar_evento(f"[{nombre_dispositivo}] {detalle}")
             return
 
         dispositivo = dispositivo_dvr_model.obtener(id_dispositivo)
