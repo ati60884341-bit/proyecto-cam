@@ -25,6 +25,12 @@ MANUALES = [
         "Cómo activar el micrófono y qué decir para controlar el sistema sin tocar el mouse.",
         "https://claude.ai/artifact/WiXGh9H6tgoVGRKTSCyvr3",
     ),
+    (
+        "Conectar la cámara, el DVR y la red",
+        "conectar_red_dvr.html",
+        "Qué cable va en cada puerto del DVR, y cómo dejarlo en la misma red que la PC antes de abrir el programa.",
+        "https://claude.ai/artifact/Aq4NLfxMrMbk5rn13BEyoj",
+    ),
 ]
 
 

@@ -162,11 +162,13 @@ Usuarios de demo (clave para ambos: `123456`):
     seccion 6) y muestre el QR para que el jurado se una desde su celular.
     Cuando tape la camara o active el modo panico, la foto + firma SHA-256
     le llega al instante a su propio telefono.
-12. **Manuales ilustrados**: la pestana **"Manuales"** trae dos guias con
+12. **Manuales ilustrados**: la pestana **"Manuales"** trae tres guias con
     diagramas para quien recien usa el programa — "Conectar tus camaras"
-    (IP/WiFi, DVR/NVR completo, USB) y "Comandos de voz". Se abren en el
-    navegador del sistema y funcionan **sin internet** (vienen guardadas
-    dentro del programa, en `app/manuales/`). Cada una tambien tiene un
+    (IP/WiFi, DVR/NVR completo, USB), "Comandos de voz" y "Conectar la
+    camara, el DVR y la red" (que cable va en cada puerto del DVR y como
+    dejarlo en la misma red que la PC, antes de abrir el programa). Se
+    abren en el navegador del sistema y funcionan **sin internet** (vienen
+    guardadas dentro del programa, en `app/manuales/`). Cada una tambien tiene un
     "Copiar enlace" a su version web (publicada como Artifact), por si hay
     que compartirla con alguien que aun no tiene el programa instalado, o
     pedir que se le agregue contenido (ej. el usuario/clave real de un

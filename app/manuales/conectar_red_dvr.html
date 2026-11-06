@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conectar la cámara, el DVR y la red — CAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f4f3ef; --surface:#ffffff; --surface-2:#eceae3; --fg:#201f1c; --fg-muted:#5c5a54;
+  --accent:#0d7d7a; --accent-ink:#ffffff; --border:#d8d5cc;
+  --warn-bg:#fdf1dc; --warn-fg:#7a4a06; --warn-border:#eecd93;
+  --ok-bg:#e8f5ea; --ok-fg:#1f6b33; --ok-border:#bfe3c6;
+  --chip-bg:#eceae3;
+  --mono-bg:#1c1b19; --mono-fg:#e7e4da;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15171a; --surface:#1d2024; --surface-2:#242830; --fg:#eceae3; --fg-muted:#9a9c9e;
+    --accent:#36d6c9; --accent-ink:#0b1413; --border:#33373d;
+    --warn-bg:#2c2415; --warn-fg:#e3b659; --warn-border:#4a3b1c;
+    --ok-bg:#15271c; --ok-fg:#7fd99a; --ok-border:#275a3a;
+    --chip-bg:#242830;
+    --mono-bg:#0d0f11; --mono-fg:#d9d6cc;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--fg); margin:0; font-family:"Source Sans 3", system-ui, sans-serif; line-height:1.55; padding:0 16px;}
+.envoltura{max-width:720px; margin:0 auto; padding-block:48px 80px;}
+h1,h2,h3{font-family:"Fraunces", Georgia, serif; text-wrap:balance; font-weight:600; letter-spacing:-0.01em;}
+h1{font-size:clamp(28px,6vw,40px); margin:0 0 6px;}
+.subtitulo{color:var(--fg-muted); font-size:17px; margin:0 0 40px; max-width:46ch;}
+h2{font-size:22px; margin:0 0 4px;}
+h3{font-size:16px; margin:0 0 8px; font-weight:600;}
+p{margin:0 0 14px;}
+.etiqueta-seccion{display:flex; align-items:baseline; gap:10px; margin:56px 0 18px;}
+.etiqueta-seccion .num{font-family:"IBM Plex Mono", monospace; font-size:13px; color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:2px 9px; flex-shrink:0;}
+.etiqueta-seccion hr{flex:1; border:none; border-top:1px solid var(--border); margin:0;}
+code, .mono{font-family:"IBM Plex Mono", monospace; font-size:.92em;}
+.checklist{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 22px; margin:0 0 16px;}
+.checklist ul{list-style:none; margin:0; padding:0; display:grid; gap:10px;}
+.checklist li{display:flex; gap:10px; align-items:flex-start;}
+.checklist li::before{content:""; width:18px; height:18px; border-radius:5px; border:2px solid var(--accent); flex-shrink:0; margin-top:2px;}
+.paso{display:flex; gap:16px; margin:0 0 26px;}
+.paso .burbuja{width:30px; height:30px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; font-family:"IBM Plex Mono", monospace;}
+.paso .contenido{min-width:0; flex:1; padding-top:2px;}
+.paso .contenido p:last-child{margin-bottom:0;}
+figure{margin:8px 0 20px;}
+figcaption{font-size:13px; color:var(--fg-muted); margin-top:8px; text-align:center;}
+svg{width:100%; height:auto; display:block;}
+.nota{border-left:3px solid var(--border); padding:4px 0 4px 14px; color:var(--fg-muted); font-size:14.5px; margin:0 0 16px;}
+.aviso{background:var(--warn-bg); color:var(--warn-fg); border:1px solid var(--warn-border); border-radius:12px; padding:14px 16px; margin:0 0 18px; font-size:14.5px;}
+.aviso strong{display:block; margin-bottom:4px; font-family:"IBM Plex Mono", monospace; font-size:12px; text-transform:uppercase; letter-spacing:.05em;}
+.exito{background:var(--ok-bg); color:var(--ok-fg); border:1px solid var(--ok-border); border-radius:12px; padding:14px 16px; margin:0 0 18px; font-size:14.5px;}
+.chip{display:inline-block; background:var(--chip-bg); border-radius:999px; padding:3px 11px; font-size:12.5px; font-family:"IBM Plex Mono", monospace; margin:0 4px 4px 0;}
+table{width:100%; border-collapse:collapse; margin:0 0 20px; font-size:14px;}
+th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top;}
+th{color:var(--fg-muted); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em;}
+.indice{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 44px;}
+.indice a{font-size:13px; color:var(--fg-muted); text-decoration:none; border:1px solid var(--border); border-radius:999px; padding:5px 12px;}
+footer{margin-top:60px; padding-top:20px; border-top:1px solid var(--border); color:var(--fg-muted); font-size:13px;}
+footer a{color:var(--accent);}
+@media print{ body{background:#fff; color:#000;} }
+</style>
+</head>
+<body>
+<div class="envoltura">
+
+<p class="chip">Manual 3 de 3</p>
+<h1>Conectar la cámara, el DVR y la red</h1>
+<p class="subtitulo">Qué cable va en cada puerto, y cómo dejar el DVR en la misma red que la computadora — antes de abrir el programa. Esto es lo físico; para dar de alta la cámara en el programa usa el manual "Conectar tus cámaras".</p>
+
+<nav class="indice">
+  <a href="#antes">Antes de empezar</a>
+  <a href="#camara-dvr">1. Cámara al DVR</a>
+  <a href="#puertos-dvr">2. Puertos del DVR</a>
+  <a href="#red">3. El DVR a la red</a>
+  <a href="#verificar">4. Verificar antes de abrir el programa</a>
+  <a href="#problemas">5. Si no aparece</a>
+</nav>
+
+<div id="antes"></div>
+<div class="etiqueta-seccion"><span class="num">0</span><hr></div>
+<h2>Antes de empezar</h2>
+<p>Son <strong>dos conexiones distintas e independientes</strong>, y las dos hacen falta. Confundir "el DVR tiene imagen" con "el DVR está en la red" es el error más común en terreno:</p>
+<div class="checklist">
+  <ul>
+    <li><strong>Video:</strong> la cámara conectada al DVR por cable coaxial/BNC + su propia alimentación de 12V. Esto es para <em>ver</em> algo.</li>
+    <li><strong>Red:</strong> el DVR conectado por cable UTP a un switch/router. Esto es para que <em>el programa</em> (o un simple <code>ping</code>) lo encuentre. Un DVR puede tener video perfecto y aun así no aparecer en el programa si le falta este cable.</li>
+  </ul>
+</div>
+<div class="aviso"><strong>Error típico en terreno</strong>Un DVR encendido, con cámara y hasta con monitor, pero sin el cable de red puesto — el programa nunca lo va a encontrar porque literalmente no está en ninguna red. Revisa este cable primero, antes de sospechar de la IP, el usuario o la clave.</div>
+
+<div id="camara-dvr"></div>
+<div class="etiqueta-seccion"><span class="num">1</span><hr></div>
+<h2>Conectar la cámara al DVR</h2>
+<p>Una cámara analógica necesita <strong>dos cables separados</strong>: uno de video (BNC) hacia el DVR, y otro de alimentación de 12V que <strong>no</strong> sale del DVR — sale de su propio adaptador.</p>
+
+<figure>
+<svg viewBox="0 0 640 240" role="img" aria-label="La cámara se conecta al DVR por cable BNC de video, y por separado a un adaptador de 12V; el DVR tiene su propio adaptador de 12V aparte.">
+  <defs>
+    <marker id="fl1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="1.6">
+    <rect x="20" y="20" width="140" height="64" rx="8"/>
+    <rect x="20" y="146" width="140" height="64" rx="8"/>
+    <rect x="430" y="18" width="190" height="72" rx="8"/>
+    <rect x="430" y="150" width="190" height="60" rx="8"/>
+  </g>
+  <text x="90" y="48" text-anchor="middle" font-size="12" font-weight="600">Cámara domo</text>
+  <text x="90" y="64" text-anchor="middle" font-size="11" opacity="0.75">(analógica)</text>
+  <text x="90" y="174" text-anchor="middle" font-size="12" font-weight="600">Adaptador 12V</text>
+  <text x="90" y="190" text-anchor="middle" font-size="11" opacity="0.75">(para la cámara)</text>
+  <text x="525" y="48" text-anchor="middle" font-size="13" font-weight="600">DVR Hikvision</text>
+  <text x="525" y="64" text-anchor="middle" font-size="11" opacity="0.75">8 entradas BNC</text>
+  <text x="525" y="176" text-anchor="middle" font-size="12" font-weight="600">Adaptador 12V</text>
+  <text x="525" y="192" text-anchor="middle" font-size="11" opacity="0.75">(para el DVR)</text>
+
+  <line x1="90" y1="146" x2="90" y2="84" stroke="currentColor" stroke-width="1.6" marker-end="url(#fl1)"/>
+  <text x="105" y="118" font-size="10.5" opacity="0.8">cable rojo/negro</text>
+  <text x="105" y="131" font-size="10.5" opacity="0.8">(12V DC)</text>
+
+  <line x1="160" y1="40" x2="430" y2="45" stroke="var(--accent)" stroke-width="2" marker-end="url(#fl1)"/>
+  <text x="295" y="30" text-anchor="middle" font-size="11.5" fill="var(--accent)" font-weight="600">cable BNC (video) → canal 1</text>
+
+  <line x1="525" y1="150" x2="525" y2="90" stroke="currentColor" stroke-width="1.6" marker-end="url(#fl1)"/>
+  <text x="540" y="124" font-size="10.5" opacity="0.8">cable de poder</text>
+  <text x="540" y="137" font-size="10.5" opacity="0.8">del DVR</text>
+</svg>
+<figcaption>Tres cables, tres destinos distintos: video (BNC) de la cámara al DVR, 12V para la cámara, y 12V aparte para el DVR. Ninguno reemplaza a otro.</figcaption>
+</figure>
+
+<div class="paso">
+  <div class="burbuja">1</div>
+  <div class="contenido"><p>Conecta el <strong>BNC amarillo</strong> de un extremo del cable a la salida de video de la cámara, y el otro extremo a <strong>cualquier entrada BNC</strong> del DVR (anota qué número de canal usaste, ej. canal 1).</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">2</div>
+  <div class="contenido"><p>Conecta el pigtail <strong>rojo/negro</strong> de la cámara al adaptador de 12V (la cajita con luz, no el DVR), y ese adaptador a un tomacorriente.</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">3</div>
+  <div class="contenido"><p>Conecta el <strong>adaptador de 12V del DVR</strong> (uno aparte del de la cámara) a la entrada de poder del DVR, y enciéndelo.</p></div>
+</div>
+<div class="nota">Si tienes un monitor a mano, conéctalo al DVR por HDMI o VGA: es la forma más rápida de confirmar que la cámara da imagen, sin depender todavía de la red ni del programa.</div>
+
+<div id="puertos-dvr"></div>
+<div class="etiqueta-seccion"><span class="num">2</span><hr></div>
+<h2>Dónde está cada puerto (parte de atrás del DVR)</h2>
+<p>El orden exacto varía un poco según el modelo, pero todo DVR Hikvision de 8 canales tiene estos grupos de puertos atrás:</p>
+
+<figure>
+<svg viewBox="0 0 640 210" role="img" aria-label="Parte trasera del DVR: 8 entradas BNC para cámaras, VGA y HDMI para un monitor, audio y USB, el puerto LAN para la red, y la entrada de poder de 12V.">
+  <g fill="none" stroke="currentColor" stroke-width="1.6">
+    <rect x="20" y="60" width="600" height="80" rx="8"/>
+  </g>
+  <text x="320" y="40" text-anchor="middle" font-size="12" opacity="0.75">Parte de atrás del DVR</text>
+
+  <g stroke="currentColor" stroke-width="1.4" fill="none">
+    <circle cx="56" cy="100" r="11"/><circle cx="90" cy="100" r="11"/><circle cx="124" cy="100" r="11"/><circle cx="158" cy="100" r="11"/>
+    <circle cx="192" cy="100" r="11"/><circle cx="226" cy="100" r="11"/><circle cx="260" cy="100" r="11"/><circle cx="294" cy="100" r="11"/>
+  </g>
+  <text x="56" y="104" text-anchor="middle" font-size="9">1</text><text x="90" y="104" text-anchor="middle" font-size="9">2</text>
+  <text x="124" y="104" text-anchor="middle" font-size="9">3</text><text x="158" y="104" text-anchor="middle" font-size="9">4</text>
+  <text x="192" y="104" text-anchor="middle" font-size="9">5</text><text x="226" y="104" text-anchor="middle" font-size="9">6</text>
+  <text x="260" y="104" text-anchor="middle" font-size="9">7</text><text x="294" y="104" text-anchor="middle" font-size="9">8</text>
+  <text x="175" y="128" text-anchor="middle" font-size="10.5">entradas BNC (cámaras)</text>
+
+  <g stroke="currentColor" stroke-width="1.4" fill="none">
+    <rect x="336" y="88" width="30" height="24" rx="3"/>
+    <rect x="378" y="88" width="30" height="24" rx="3"/>
+  </g>
+  <text x="351" y="128" text-anchor="middle" font-size="10">VGA</text>
+  <text x="393" y="128" text-anchor="middle" font-size="10">HDMI</text>
+  <text x="372" y="70" text-anchor="middle" font-size="10" opacity="0.75">monitor local</text>
+
+  <g stroke="currentColor" stroke-width="1.4" fill="none">
+    <rect x="424" y="88" width="24" height="24" rx="3"/>
+    <rect x="456" y="88" width="24" height="24" rx="3"/>
+  </g>
+  <text x="456" y="128" text-anchor="middle" font-size="10">audio / USB</text>
+
+  <g stroke="var(--accent)" stroke-width="2.2" fill="none">
+    <rect x="502" y="84" width="40" height="30" rx="4"/>
+  </g>
+  <text x="522" y="140" text-anchor="middle" font-size="11" fill="var(--accent)" font-weight="600">LAN</text>
+  <text x="522" y="153" text-anchor="middle" font-size="9.5" fill="var(--accent)">← conectar aquí el cable de red</text>
+
+  <g stroke="currentColor" stroke-width="1.4" fill="none">
+    <circle cx="580" cy="100" r="13"/>
+  </g>
+  <text x="580" y="128" text-anchor="middle" font-size="10">12V</text>
+</svg>
+<figcaption>El puerto LAN (resaltado) es el que suele quedar sin usar porque no hace falta para ver video local — pero es el único que el programa necesita.</figcaption>
+</figure>
+
+<div id="red"></div>
+<div class="etiqueta-seccion"><span class="num">3</span><hr></div>
+<h2>Conectar el DVR a la red</h2>
+<p>El DVR y las cámaras <strong>no necesitan internet</strong> — todo esto funciona en una red local propia, aunque no haya wifi del lugar ni línea telefónica. Para eso llevan su propio router.</p>
+
+<figure>
+<svg viewBox="0 0 640 280" role="img" aria-label="El router TP-Link alimenta al switch PoE Hikvision por cable UTP; el switch se conecta al puerto LAN del DVR; la laptop se une a la misma red por WiFi o cable. El internet portátil, si hace falta, va aparte, en otro adaptador de la laptop, sin tocar esta red.">
+  <defs>
+    <marker id="fl2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="1.6">
+    <rect x="20" y="90" width="140" height="62" rx="8"/>
+    <rect x="250" y="90" width="140" height="62" rx="8"/>
+    <rect x="480" y="20" width="140" height="62" rx="8"/>
+    <rect x="480" y="168" width="140" height="62" rx="8"/>
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 4">
+    <rect x="20" y="200" width="140" height="56" rx="8"/>
+  </g>
+
+  <text x="90" y="116" text-anchor="middle" font-size="12" font-weight="600">Router TP-Link</text>
+  <text x="90" y="132" text-anchor="middle" font-size="10.5" opacity="0.75">WiFi + DHCP</text>
+
+  <text x="320" y="116" text-anchor="middle" font-size="12" font-weight="600">Switch PoE</text>
+  <text x="320" y="132" text-anchor="middle" font-size="10.5" opacity="0.75">Hikvision</text>
+
+  <text x="550" y="46" text-anchor="middle" font-size="12" font-weight="600">DVR Hikvision</text>
+  <text x="550" y="62" text-anchor="middle" font-size="10.5" opacity="0.75">puerto LAN</text>
+
+  <text x="550" y="194" text-anchor="middle" font-size="12" font-weight="600">Esta laptop</text>
+  <text x="550" y="210" text-anchor="middle" font-size="10.5" opacity="0.75">programa CAM</text>
+
+  <text x="90" y="226" text-anchor="middle" font-size="11" font-weight="600" opacity="0.8">Internet portátil</text>
+  <text x="90" y="242" text-anchor="middle" font-size="9.5" opacity="0.7">(opcional, red APARTE —</text>
+  <text x="90" y="254" text-anchor="middle" font-size="9.5" opacity="0.7">no se conecta al switch/DVR)</text>
+
+  <line x1="160" y1="118" x2="250" y2="118" stroke="currentColor" stroke-width="1.6" marker-end="url(#fl2)"/>
+  <text x="205" y="110" text-anchor="middle" font-size="10">cable UTP</text>
+
+  <line x1="390" y1="112" x2="480" y2="60" stroke="var(--accent)" stroke-width="2" marker-end="url(#fl2)"/>
+  <text x="450" y="80" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-weight="600">cable UTP → LAN del DVR</text>
+
+  <line x1="390" y1="130" x2="480" y2="192" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#fl2)"/>
+  <text x="450" y="168" text-anchor="middle" font-size="10">WiFi o cable</text>
+  <text x="450" y="180" text-anchor="middle" font-size="9.5" opacity="0.75">(misma red)</text>
+</svg>
+<figcaption>Dos redes separadas a propósito: la del DVR/cámaras (izquierda-derecha, sin internet) y el internet portátil (abajo, punteado) — si el internet portátil se mezclara con la red del DVR, un corte de señal del celular podría tumbar también la vista de cámaras.</figcaption>
+</figure>
+
+<div class="paso">
+  <div class="burbuja">1</div>
+  <div class="contenido"><p>Enciende el router TP-Link y el switch PoE Hikvision. Conecta un cable UTP de un puerto <strong>LAN</strong> del router a cualquier puerto del switch.</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">2</div>
+  <div class="contenido"><p>Conecta otro cable UTP del puerto <strong>LAN</strong> del DVR (el que resaltamos en la sección 2) a cualquier puerto del switch.</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">3</div>
+  <div class="contenido"><p>Conecta esta laptop a la <strong>red del TP-Link</strong> — por WiFi (busca su nombre de red) o por cable a otro puerto del switch. No sirve estar en otra red, aunque tenga internet.</p></div>
+</div>
+<div class="aviso"><strong>Si llevan internet portátil (celular, módem 4G)</strong>Úsenlo en OTRO adaptador de la laptop (el WiFi del celular, por ejemplo), nunca conectado al switch o al router del DVR. Así el DVR nunca depende de que haya internet — y un corte del celular no afecta a las cámaras.</div>
+
+<div id="verificar"></div>
+<div class="etiqueta-seccion"><span class="num">4</span><hr></div>
+<h2>Verificar antes de abrir el programa</h2>
+<p>Estos tres pasos cuestan menos de un minuto y evitan perder tiempo armando una conexión que la red ni siquiera deja llegar:</p>
+<div class="paso">
+  <div class="burbuja">1</div>
+  <div class="contenido"><p>Abre el programa y entra a <strong>"NVR / DVR"</strong> o <strong>"Radar de cámaras"</strong>: arriba del formulario está el panel <strong>"Mi red"</strong>, que muestra la IP y la red de esta laptop en cada adaptador.</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">2</div>
+  <div class="contenido"><p>Compara esa "red" con la IP que vas a escribir para el DVR (ej. <code>192.168.1.64</code> → red <code>192.168.1.0/24</code>). Si no coinciden, la laptop está en otra red — revisa el paso 3 de la sección anterior antes de seguir.</p></div>
+</div>
+<div class="paso">
+  <div class="burbuja">3</div>
+  <div class="contenido"><p>¿No sabes la IP del DVR? Usa <strong>"Radar de cámaras"</strong> y pulsa "Iniciar escaneo": lo encuentra solo, sin que tengas que saberla de antemano.</p></div>
+</div>
+
+<div id="problemas"></div>
+<div class="etiqueta-seccion"><span class="num">5</span><hr></div>
+<h2>Si el DVR sigue sin aparecer</h2>
+<p>Desde esta versión, el programa distingue en qué parte se cortó la conexión en vez de dar un mensaje genérico:</p>
+<table>
+  <tr><th>Mensaje del programa</th><th>Qué significa</th></tr>
+  <tr><td>"Sin respuesta de red (ping)..."</td><td>No hay ruta de red hasta el DVR: falta el cable UTP, el switch/router está apagado, o la laptop está en otra red (vuelve a la sección 3).</td></tr>
+  <tr><td>"La red llega... pero el puerto no responde"</td><td>La red sí conecta; revisa que el servicio de red del DVR esté activo, el puerto configurado, o un firewall bloqueándolo.</td></tr>
+  <tr><td>"No respondió ningún canal" (con el DVR alcanzable)</td><td>Revisa usuario/clave y que el canal exista en ese DVR.</td></tr>
+</table>
+<div class="exito"><strong>Antes de llamar a soporte:</strong> si el panel "Mi red" y la IP del DVR muestran la misma red, y aun así no conecta — ahí sí vale la pena revisar usuario/clave o el equipo mismo. Si NO muestran la misma red, es un tema de cableado, no del programa.</div>
+
+<footer>Manual 3 de 3 — Conectar la cámara, el DVR y la red. Los otros dos manuales (cámaras, comandos de voz) se abren desde el mismo menú "Manuales" del programa.</footer>
+</div>
+</body>
+</html>
