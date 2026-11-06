@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import (
     QTextEdit,
 )
 
+from app.views.UI.panel_mi_red import PanelMiRed
+
 MARCAS_DVR = ["Hikvision", "Dahua"]
 COLUMNAS = ["ID", "Nombre", "Marca", "IP", "Canales", "Camaras activas"]
 
@@ -35,6 +37,8 @@ class DvrView(QWidget):
             "asi se ve en el Centro de Monitoreo TODO lo que esta conectado al grabador."
         )
         layout.addWidget(intro)
+
+        layout.addWidget(PanelMiRed())
 
         grupo = QGroupBox("Registrar un DVR/NVR nuevo")
         formulario = QFormLayout(grupo)

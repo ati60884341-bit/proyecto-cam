@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QTextEdit,
 )
 
+from app.views.UI.panel_mi_red import PanelMiRed
+
 COLUMNAS = ["IP", "Marca", "Modelo", "Tipo detectado", "Canales", "Como se encontro"]
 
 
@@ -33,6 +35,8 @@ class RadarView(QWidget):
             "o un grabador con varios canales es una ESTIMACION — confirmela al agregarlo de verdad."
         )
         layout.addWidget(intro)
+
+        layout.addWidget(PanelMiRed())
 
         fila_controles = QHBoxLayout()
         self.btn_escanear = QPushButton("Iniciar escaneo")
