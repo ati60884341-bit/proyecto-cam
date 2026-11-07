@@ -73,3 +73,24 @@ def _interfaz_desde_bloque(nombre, lineas):
     except ValueError:
         red = ""
     return {"interfaz": nombre, "ip": ip, "mascara": mascara, "red": red}
+
+
+def ip_en_red_local(ip, interfaces=None):
+    """True si `ip` cae dentro de la red de alguno de los adaptadores de
+    ESTA PC (ver listar_interfaces_red) - o sea, si hay chance real de
+    alcanzarla sin pasar por un router externo. Permite avisar en la tabla
+    de grabadores registrados "este DVR no esta en tu red actual" ANTES de
+    que el tecnico pierda tiempo esperando a que falle la deteccion de
+    canales, por ejemplo cuando el DVR usa DHCP y el router le reasigno
+    otra IP distinta a la que quedo guardada."""
+    if interfaces is None:
+        interfaces = listar_interfaces_red()
+    try:
+        direccion = ipaddress.IPv4Address(ip)
+    except ValueError:
+        return None  # IP invalida/vacia: no es un "no" (no se puede opinar)
+    for interfaz in interfaces:
+        red = interfaz.get("red")
+        if red and direccion in ipaddress.IPv4Network(red):
+            return True
+    return False

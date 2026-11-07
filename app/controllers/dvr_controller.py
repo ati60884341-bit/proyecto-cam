@@ -2,7 +2,7 @@ import traceback
 
 from PyQt6.QtWidgets import QMessageBox
 
-from app.models import camara_model, zona_model, dispositivo_dvr_model
+from app.models import camara_model, zona_model, dispositivo_dvr_model, perfil_sitio_model, bitacora_model
 from app.services.camera_service import DeteccionCanalesDVRThread
 
 
@@ -29,8 +29,14 @@ class DvrController:
         self.view.detectar_nuevos_solicitado.connect(self.detectar_nuevos)
         self.view.quitar_solicitado.connect(self.quitar)
         self.view.refrescar_solicitado.connect(self.cargar)
+        self.view.usar_perfil_solicitado.connect(self.usar_perfil)
+        self.view.guardar_perfil_solicitado.connect(self.guardar_perfil)
+        self.view.agregar_nota_solicitada.connect(self.agregar_nota)
+        self.view.fila_dvr_seleccionada.connect(self.mostrar_bitacora)
+        self.view.primera_vez_visible.connect(self.view.mostrar_checklist_red)
         self.view.permitir_quitar(usuario["Rol"] == "Administrador")
         self.cargar()
+        self.cargar_perfiles()
 
     def cargar(self):
         self._dispositivos = dispositivo_dvr_model.listar()
@@ -175,3 +181,45 @@ class DvrController:
         self.view.registrar_evento(
             f"[{dispositivo['Nombre']}] Grabador quitado junto con sus {len(camaras)} camara(s)."
         )
+
+    # ---------------- perfiles de sitio ----------------
+    def cargar_perfiles(self):
+        self._perfiles = perfil_sitio_model.listar()
+        self.view.cargar_perfiles(self._perfiles)
+
+    def usar_perfil(self, id_perfil):
+        perfil = next((p for p in self._perfiles if p["IdPerfil"] == id_perfil), None)
+        if not perfil:
+            return
+        self.view.aplicar_perfil(perfil)
+
+    def guardar_perfil(self, datos):
+        try:
+            perfil_sitio_model.crear(
+                datos["nombre"], datos["ip_dvr_tipica"] or None, int(datos["puerto_tipico"] or 554),
+                datos["marca_tipica"] or None, datos["usuario_tipico"] or "admin",
+                datos["nombre_red_router"] or None, datos["notas"] or None,
+            )
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.warning(self.view, "No se pudo guardar el perfil", str(exc))
+            return
+        self.cargar_perfiles()
+        self.view.perfil_guardado(datos["nombre"])
+
+    # ---------------- bitacora de instalacion (compartida) ----------------
+    def mostrar_bitacora(self, id_dispositivo):
+        if id_dispositivo is None:
+            self.view.limpiar_bitacora()
+            return
+        notas = bitacora_model.listar_por_dispositivo(id_dispositivo)
+        self.view.mostrar_bitacora(notas)
+
+    def agregar_nota(self, id_dispositivo, texto):
+        try:
+            bitacora_model.agregar(id_dispositivo, self.usuario.get("IdUsuario"), texto)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.warning(self.view, "No se pudo agregar la nota", str(exc))
+            return
+        self.mostrar_bitacora(id_dispositivo)

@@ -47,6 +47,11 @@ tambien `db/06_dispositivos_dvr.sql` una vez (agrega la tabla
 `cam.DispositivosDVR` y dos columnas en `cam.Camaras`, no borra nada de lo
 existente), y `db/07_capacidades_camara.sql` (agrega la columna `TienePTZ`).
 
+Para los "Perfiles de sitio" y la "Bitacora de instalacion" de la misma
+pestana (ver seccion 4) corra tambien `db/10_perfiles_sitio.sql` (agrega
+`cam.PerfilesSitio`) y `db/11_bitacora_instalacion.sql` (agrega
+`cam.BitacoraInstalacion`) — ninguna borra nada existente.
+
 Si ya probo la app con los datos de ejemplo de `03_seed.sql` (zonas
 Ingreso/Patio/Estacionamiento/Pasillo con camaras simuladas) y ahora va a
 trabajar con camaras reales, corra `db/08_zonas_ejemplo.sql` y despues
@@ -145,6 +150,33 @@ Usuarios de demo (clave para ambos: `123456`):
    nuevos" (salta los que ya tiene, no los duplica). "Quitar grabador y
    sus camaras" detiene todas sus camaras en vivo y las marca inactivas de
    una sola vez (solo Administrador).
+
+   **Checklist de red al entrar por primera vez:** la primera vez en cada
+   sesion que se abre la pestana "NVR / DVR" aparece un dialogo con 3
+   casillas (cable UTP puesto, esta PC en la misma red, internet portatil
+   en otro adaptador) que hay que marcar antes de poder seguir — evita
+   perder tiempo armando una conexion que la red ni siquiera deja llegar.
+   Tiene un boton para abrir el manual ilustrado completo.
+
+   **Columna "En esta red":** la tabla de grabadores registrados compara
+   la IP de cada uno contra las redes activas de esta PC (mismo calculo
+   que el panel "Mi red") y marca en rojo los que estan en otra subred —
+   util cuando el DVR usa DHCP y el router le reasigno otra IP distinta a
+   la guardada.
+
+   **Perfiles de sitio:** si ya se instalo antes en un taller/cliente,
+   el combo "Perfil de sitio" precarga su IP, puerto, marca y usuario
+   tipicos (no la clave, esa se escribe a mano cada vez); "Guardar datos
+   de abajo como perfil nuevo" lo crea a partir de lo que haya en el
+   formulario. Se guarda en la base central (`cam.PerfilesSitio`), visible
+   para todo el equipo.
+
+   **Bitacora de instalacion compartida:** al seleccionar un grabador en
+   la tabla, el panel de abajo muestra sus notas (`cam.BitacoraInstalacion`)
+   y deja agregar una nueva — para que el siguiente tecnico no repita un
+   diagnostico que otro ya hizo (ej. "este DVR necesita el puerto 8000, no
+   el 554"). Las notas quedan ligadas al usuario y la fecha, y las ve todo
+   el equipo, no solo quien las escribio.
 
    **Camaras USB/integradas en otra laptop:** el indice de la webcam no es
    siempre 0 (varia segun el equipo). Con conexion "USB" seleccionada,
