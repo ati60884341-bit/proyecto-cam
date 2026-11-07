@@ -44,6 +44,7 @@ EVIDENCIAS_DIR = os.path.join(BASE_DIR, "evidencias")
 os.makedirs(EVIDENCIAS_DIR, exist_ok=True)
 
 MANUALES_DIR = os.path.join(RECURSOS_DIR, "app", "manuales")
+IMAGENES_DIR = os.path.join(RECURSOS_DIR, "app", "recursos", "imagenes")
 
 # BUFFER_SEGUNDOS = segundos que guarda la "maquina del tiempo" antes de un sabotaje
 BUFFER_SEGUNDOS = 8

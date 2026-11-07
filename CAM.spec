@@ -18,7 +18,16 @@ datas = collect_data_files("mediapipe", include_py_files=False)
 # manuales ilustrados (pestana "Manuales"): se abren con el navegador del
 # sistema vía app.config.MANUALES_DIR, que en el .exe apunta a sys._MEIPASS
 datas += [("app/manuales/conectar_camaras.html", "app/manuales"),
-          ("app/manuales/comandos_voz.html", "app/manuales")]
+          ("app/manuales/comandos_voz.html", "app/manuales"),
+          ("app/manuales/conectar_red_dvr.html", "app/manuales")]
+
+# fondo nocturno animado (splash, login, sidebar): via app.config.IMAGENES_DIR
+# el .png es la version fija (sidebar, quieta por rendimiento) y el .gif es
+# la animacion real (splash/login) - ver app/views/UI/fondo_nocturno.py
+datas += [
+    ("app/recursos/imagenes/fondo_nocturno.png", "app/recursos/imagenes"),
+    ("app/recursos/imagenes/fondo_nocturno.gif", "app/recursos/imagenes"),
+]
 
 hiddenimports = [
     "pyttsx3.drivers",
