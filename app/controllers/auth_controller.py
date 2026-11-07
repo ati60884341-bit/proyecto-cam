@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import QMessageBox
 
 from app.models import usuario_model
 from app.controllers.app_controller import AppController
+from app.services.actualizador import HiloBuscarActualizacion
+from app.views.UI.dialogo_actualizacion import DialogoActualizacion
 
 
 class AuthController:
@@ -11,6 +13,7 @@ class AuthController:
         self.login_view = login_view
         self.login_view.intento_login.connect(self.manejar_login)
         self.app_controller = None
+        self._hilo_buscar_actualizacion = None
 
     def manejar_login(self, nombre_usuario, clave):
         if not nombre_usuario or not clave:
@@ -41,6 +44,21 @@ class AuthController:
         self.app_controller.main_window.btn_salir.clicked.connect(self._cerrar_sesion)
         self.app_controller.show()
         self.login_view.close()
+        self._buscar_actualizacion()
+
+    def _buscar_actualizacion(self):
+        """Consulta GitHub Releases en segundo plano (no atrasa el login) y,
+        si hay una version mas nueva publicada, ofrece actualizar - ver
+        app/services/actualizador.py. Sin internet o sin ninguna release
+        todavia, simplemente no pasa nada (no es un error para el usuario)."""
+        self._hilo_buscar_actualizacion = HiloBuscarActualizacion()
+        self._hilo_buscar_actualizacion.encontrada.connect(self._ofrecer_actualizacion)
+        self._hilo_buscar_actualizacion.start()
+
+    def _ofrecer_actualizacion(self, info):
+        if self.app_controller is None:
+            return  # la sesion ya se cerro mientras se consultaba
+        DialogoActualizacion(info, self.app_controller.main_window).exec()
 
     def _cerrar_sesion(self):
         if self.app_controller:

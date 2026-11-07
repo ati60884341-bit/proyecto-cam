@@ -23,7 +23,12 @@
 ;   (el fwlink viejo que estaba comentado aca quedo dado de baja)
 
 #define MyAppName "ProyectoCAM"
-#define MyAppVersion "1.0.0"
+; IMPORTANTE: mantener esto igual a VERSION en app/version.py - el
+; auto-actualizador (app/services/actualizador.py) compara esta misma
+; cadena contra el ultimo tag publicado en GitHub Releases. Cada release
+; nueva: subir los dos numeros, compilar, y publicar este .exe como
+; asset de un release de GitHub con el tag "v{#MyAppVersion}".
+#define MyAppVersion "1.1.0"
 
 [Setup]
 AppName={#MyAppName}
@@ -38,6 +43,13 @@ Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
+; el auto-actualizador descarga este instalador y lo corre con el propio
+; ProyectoCAM.exe todavia abierto (el usuario nunca lo cierra a mano): esto
+; hace que el instalador lo cierre solo (via Restart Manager de Windows)
+; antes de copiar los archivos nuevos, en vez de fallar porque el .exe
+; viejo esta en uso
+CloseApplications=yes
+RestartApplications=no
 
 [Files]
 ; copia toda la carpeta generada por PyInstaller
