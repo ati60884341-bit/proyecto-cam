@@ -13,7 +13,7 @@ from app.services.fatiga_service import AuditorFatiga
 from app.services.voice_service import AsistenteVozThread, interpretar_comando, hablar, registrar_zona, normalizar
 from app.services.panic_service import DetectorPanicoThread
 from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread
-from app.services import telegram_service
+from app.services import telegram_service, alarma_service
 from app.views.UI.zona_ampliada_dialog import ZonaAmpliadaDialog
 
 import cv2
@@ -56,6 +56,16 @@ class MonitoreoController:
         self.view.deteccion_gesto_alternada.connect(self._alternar_deteccion_gesto)
         self.view.panico_manual.connect(self.activar_panico)
         self.view.fatiga_confirmada.connect(self._confirmar_fatiga)
+        self.view.alarma_silenciada.connect(lambda: self._silenciar_alarma("silenciada por el vigilante"))
+
+        # sirena de camara tapada: suena mientras haya alguna zona en
+        # sabotaje; se apaga sola al destaparlas, con el boton, o al llegar
+        # al tiempo maximo (para no sonar toda la noche si nadie esta)
+        self._zonas_en_sabotaje = set()
+        self._alarma_sonando = False
+        self._timer_alarma = QTimer()
+        self._timer_alarma.setSingleShot(True)
+        self._timer_alarma.timeout.connect(lambda: self._silenciar_alarma("paso el tiempo maximo de 60 s"))
 
         self.hilo_voz = None
         self.detector_panico = None
@@ -171,8 +181,7 @@ class MonitoreoController:
         # recuadro, lo que en la practica resulto inestable
         hilo_anterior = self.hilos_camara.get(zona)
         if hilo_anterior:
-            hilo_anterior.detener()
-            hilo_anterior.wait(1500)
+            self._retirar_hilo(hilo_anterior)
 
         hilo = CamaraThread(
             camara["IdCamara"], zona, camara["Nombre"],
@@ -186,6 +195,24 @@ class MonitoreoController:
         if zona == "Ingreso" and getattr(self, "detector_panico", None):
             hilo.frame_listo.connect(self.detector_panico.alimentar_frame)
         return hilo
+
+    def _retirar_hilo(self, hilo):
+        """Detiene un hilo de camara sin destruirlo mientras sigue corriendo:
+        puede estar hasta ~4s dentro de una apertura RTSP (timeout real), y
+        soltar la ultima referencia a un QThread vivo cierra la app de golpe.
+        Se guarda en _hilos_retirados hasta que termine solo."""
+        hilo.detener()
+        try:
+            hilo.frame_listo.disconnect()
+            hilo.estado_cambiado.disconnect()
+            hilo.sabotaje_detectado.disconnect()
+        except TypeError:
+            pass
+        if hilo.wait(1500):
+            return
+        retirados = self.__dict__.setdefault("_hilos_retirados", [])
+        retirados.append(hilo)
+        hilo.finished.connect(lambda h=hilo: h in retirados and retirados.remove(h))
 
     def agregar_camara(self, camara):
         """Agrega (o reemplaza) la camara de una zona en caliente, sin
@@ -213,8 +240,7 @@ class MonitoreoController:
         ampliada si estaba abierta) hasta que se agregue una camara nueva."""
         hilo = self.hilos_camara.pop(zona, None)
         if hilo:
-            hilo.detener()
-            hilo.wait(1500)
+            self._retirar_hilo(hilo)
         self.camaras_por_zona.pop(zona, None)
         self.factor_zoom.pop(zona, None)
 
@@ -249,15 +275,21 @@ class MonitoreoController:
         return cv2.resize(recorte, (ancho, alto), interpolation=cv2.INTER_LINEAR)
 
     def _on_frame(self, zona, frame):
-        factor = self.factor_zoom.get(zona, 1.0)
-        if factor > 1.0:
-            frame = self._aplicar_zoom(frame, factor)
-        zf = self.view.zona_widget(zona)
-        if zf:
-            zf.mostrar_frame(frame)
-        dialogo = self.dialogos_ampliados.get(zona)
-        if dialogo and dialogo.isVisible():
-            dialogo.mostrar_frame(frame)
+        try:
+            factor = self.factor_zoom.get(zona, 1.0)
+            if factor > 1.0:
+                frame = self._aplicar_zoom(frame, factor)
+            zf = self.view.zona_widget(zona)
+            if zf:
+                zf.mostrar_frame(frame)
+            dialogo = self.dialogos_ampliados.get(zona)
+            if dialogo and dialogo.isVisible():
+                dialogo.mostrar_frame(frame)
+        finally:
+            # pide el siguiente frame recien ahora (ver CamaraThread.confirmar_entrega)
+            hilo = self.hilos_camara.get(zona)
+            if hilo:
+                hilo.confirmar_entrega()
 
     def _actualizar_progreso_gesto(self, detectando, segundos):
         if detectando and segundos > 0.2:
@@ -275,6 +307,35 @@ class MonitoreoController:
             zf.actualizar_estado(estado)
         if estado == "sabotaje":
             self.view.registrar_evento(f"[ALERTA] Posible sabotaje detectado en {zona}.")
+            self._zonas_en_sabotaje.add(zona)
+            self._activar_alarma()
+        elif zona in self._zonas_en_sabotaje:
+            # se destapo (o perdio senal/reconecta): esa zona ya no cuenta
+            self._zonas_en_sabotaje.discard(zona)
+            if not self._zonas_en_sabotaje:
+                self._silenciar_alarma(motivo="la camara volvio a verse normal")
+            elif self._alarma_sonando:
+                self.view.set_alarma_sonando(True, sorted(self._zonas_en_sabotaje))
+
+    # ---------------- sirena de camara tapada ----------------
+    DURACION_MAXIMA_ALARMA_MS = 60_000
+
+    def _activar_alarma(self):
+        if not self._alarma_sonando:
+            if not alarma_service.iniciar_sirena():
+                QApplication.beep()
+            self._alarma_sonando = True
+        self._timer_alarma.start(self.DURACION_MAXIMA_ALARMA_MS)
+        self.view.set_alarma_sonando(True, sorted(self._zonas_en_sabotaje))
+
+    def _silenciar_alarma(self, motivo):
+        if not self._alarma_sonando:
+            return
+        alarma_service.detener_sirena()
+        self._alarma_sonando = False
+        self._timer_alarma.stop()
+        self.view.set_alarma_sonando(False)
+        self.view.registrar_evento(f"[ALARMA] Sirena apagada ({motivo}).")
 
     # ---------------- sabotaje automatico ----------------
     def _on_sabotaje(self, zona, ruta_video, ruta_foto):
@@ -305,7 +366,8 @@ class MonitoreoController:
         self.view.registrar_evento(
             f"[EVIDENCIA] Sabotaje en {zona}: foto y video (8s previos) firmados con SHA-256 y guardados."
         )
-        QApplication.beep()
+        # (el sonido ya lo da la sirena, que arranca en _on_estado apenas se
+        # detecta, sin esperar a que se exporte la evidencia)
 
         if os.path.exists(ruta_foto) and hash_foto:
             telegram_service.enviar_foto_async(
@@ -546,6 +608,7 @@ class MonitoreoController:
     def detener(self):
         # se pide el paro de todos los hilos primero (en paralelo) y luego
         # se espera cada uno: mucho mas rapido que detener+esperar de a uno
+        alarma_service.detener_sirena()
         for hilo in self.hilos_camara.values():
             hilo.detener()
         if self.hilo_voz:
@@ -554,8 +617,14 @@ class MonitoreoController:
             self.detector_panico.detener()
         self.fatiga.detener()
 
-        for hilo in self.hilos_camara.values():
-            hilo.wait(1500)
+        # una camara puede estar dentro de una apertura RTSP (hasta ~4s con
+        # timeout real): se espera hasta un limite total para cerrar limpio
+        # en vez de destruir un QThread vivo (eso cierra la app con error)
+        limite = time.time() + 6.0
+        hilos = list(self.hilos_camara.values()) + list(self.__dict__.get("_hilos_retirados", []))
+        for hilo in hilos:
+            hilo.detener()
+            hilo.wait(max(100, int((limite - time.time()) * 1000)))
         if self.hilo_voz:
             self.hilo_voz.wait(1500)
         if self.detector_panico:

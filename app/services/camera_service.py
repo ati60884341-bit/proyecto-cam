@@ -1,7 +1,6 @@
 import os
 import socket
 import subprocess
-import threading
 import time
 from collections import deque
 from urllib.parse import urlparse
@@ -33,13 +32,20 @@ def _abrir_captura(tipo_conexion, url_conexion):
             indice = 0
         return cv2.VideoCapture(indice, cv2.CAP_DSHOW)
 
+    # los timeouts van COMO PARAMETROS de open(): fijarlos con cap.set() antes
+    # de abrir (como se hacia) OpenCV los ignora y usa su default de 30s. Eso
+    # importa mucho: OpenCV abre las capturas FFmpeg de a una (candado global),
+    # asi que un solo canal colgado (ej. canal vacio de un NVR Dahua) frenaba
+    # 30s la conexion de TODAS las demas camaras
+    timeout_ms = int(TIMEOUT_CONEXION_RTSP_SEG * 1000)
     cap = cv2.VideoCapture()
     try:
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 4000)
-        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 4000)
-    except Exception:
-        pass
-    cap.open(url_conexion, cv2.CAP_FFMPEG)
+        cap.open(url_conexion, cv2.CAP_FFMPEG, [
+            cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout_ms,
+            cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout_ms,
+        ])
+    except (cv2.error, TypeError):
+        cap.open(url_conexion, cv2.CAP_FFMPEG)  # build viejo sin parametros en open()
     try:
         # buffer minimo: sin esto, OpenCV acumula frames viejos en cola y el
         # video en pantalla se va atrasando cada vez mas respecto al tiempo real
@@ -83,10 +89,13 @@ def _hay_ruta_de_red(ip, timeout=1.5):
             comando = ["ping", "-c", "1", "-W", str(max(1, int(timeout))), ip]
             flags = 0
         resultado = subprocess.run(
-            comando, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            comando, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             timeout=timeout + 1, creationflags=flags,
         )
-        return resultado.returncode == 0
+        # en Windows, si el ARP falla la PC se responde a si misma "Host de
+        # destino inaccesible" y ping sale con codigo 0 aunque el equipo no
+        # exista: solo una respuesta real trae TTL=
+        return resultado.returncode == 0 and b"TTL=" in resultado.stdout.upper()
     except Exception:
         return False
 
@@ -113,31 +122,99 @@ def _diagnostico_red(host, puerto, timeout_ping=1.5, timeout_puerto=2.0):
     )
 
 
+def _ips_locales():
+    """IPv4 de esta PC (cable y Wi-Fi), sin loopback ni APIPA (169.254.x)."""
+    try:
+        ips = socket.gethostbyname_ex(socket.gethostname())[2]
+    except OSError:
+        ips = []
+    return [ip for ip in ips if not ip.startswith(("127.", "169.254."))]
+
+
+def _buscar_equipos_de_video(ip_esperada, puerto):
+    """Cuando el DVR no responde en la IP registrada, lo mas comun es que
+    haya cambiado de IP: con DHCP activo el router le da otra (ej. queda en
+    .103 en vez del .64 de fabrica de Hikvision). Barre el puerto de video
+    en las subredes /24 de esta PC y devuelve las IPs que lo tienen abierto,
+    para que el tecnico vea donde quedo el grabador en vez de un "no responde"."""
+    from concurrent.futures import ThreadPoolExecutor
+    import ipaddress
+
+    locales = _ips_locales()
+    redes = {ipaddress.ip_network(f"{ip}/24", strict=False) for ip in locales}
+    candidatos = [str(h) for red in redes for h in red.hosts()
+                  if str(h) not in locales and str(h) != ip_esperada]
+    if not candidatos:
+        return []
+    with ThreadPoolExecutor(max_workers=64) as pool:
+        abiertos = pool.map(lambda ip: ip if _puerto_abierto(ip, puerto, 0.4) else None, candidatos)
+        return sorted((ip for ip in abiertos if ip), key=lambda ip: tuple(int(p) for p in ip.split(".")))
+
+
+def _sugerencia_ip_alternativa(ip_esperada, puerto):
+    encontrados = _buscar_equipos_de_video(ip_esperada, puerto)
+    if not encontrados:
+        return ""
+    lista = ", ".join(encontrados[:5])
+    return (
+        f" En esta red SI hay equipo(s) de video con el puerto {puerto} abierto: {lista}. "
+        "Probablemente el grabador cambio de IP (DHCP activo): vea su IP real en el "
+        "DVR (Configuracion > Red > TCP/IP), registrelo con esa IP y, para que no vuelva "
+        "a cambiar, desactive DHCP en el DVR y deje esa IP fija."
+    )
+
+
+def _diagnostico_credenciales(marca, ip, usuario, clave, timeout=4.0):
+    """Si el grabador responde pero ningun canal dio imagen, la causa mas
+    comun es usuario/clave. RTSP (via FFmpeg) no distingue ese caso, asi que
+    se pregunta a la API web del grabador con autenticacion Digest: un 401
+    ahi confirma que la clave es la que esta mal. Devuelve None si no se
+    puede saber (sin web, marca desconocida) o si la clave es correcta."""
+    if not clave:
+        return (
+            "Este grabador quedo registrado SIN clave y el DVR la exige. Quitelo "
+            "y registrelo de nuevo escribiendo la clave del DVR."
+        )
+    rutas = {
+        "Hikvision": "/ISAPI/System/deviceInfo",
+        "Dahua": "/cgi-bin/magicBox.cgi?action=getDeviceType",
+    }
+    ruta = rutas.get(marca)
+    if not ruta:
+        return None
+    try:
+        import requests
+        from requests.auth import HTTPDigestAuth
+
+        r = requests.get(f"http://{ip}{ruta}", auth=HTTPDigestAuth(usuario, clave), timeout=timeout)
+    except Exception:
+        return None
+    if r.status_code == 401:
+        return (
+            f"El grabador {ip} rechazo el usuario \"{usuario}\" o la clave. Revise la "
+            "clave (distingue mayusculas) y vuelva a registrarlo. Ojo: tras varios "
+            "intentos fallidos el DVR bloquea al usuario unos 30 minutos."
+        )
+    return None
+
+
 def _abrir_captura_sin_bloqueo(tipo_conexion, url_conexion):
-    """Para RTSP: ni OPENCV_FFMPEG_CAPTURE_OPTIONS ni CAP_PROP_OPEN_TIMEOUT_MSEC
-    son fiables en todos los builds de OpenCV (algunos ignoran el timeout y
-    heredan el timeout TCP del SO, ~30s). Primero se hace una verificacion TCP
-    rapida (2s) y, solo si el host responde, se abre en un hilo aparte con un
-    watchdog de TIMEOUT_CONEXION_RTSP_SEG adicional (el hilo sigue intentando
-    en segundo plano como daemon si se excede, sin bloquear la UI ni al hilo
-    de la camara)."""
+    """Para RTSP: verificacion TCP rapida (2s) y, si el host responde, apertura
+    con timeout real (ver _abrir_captura). Se llama solo desde hilos de fondo
+    (CamaraThread, deteccion de canales, prueba de conexion), nunca desde la UI.
+
+    Antes se abria en un hilo daemon con un watchdog de 4s: si se pasaba, se
+    devolvia "sin senal" pero el intento seguia vivo esperando el candado
+    global de OpenCV, y cada reintento (cada ~7s por camara) sumaba otro a la
+    fila. Con un canal colgado la fila crecia sin fin y ninguna camara volvia
+    a conectar; las que si abrian en segundo plano quedaban sin liberar,
+    ocupando conexiones del DVR. Ahora cada hilo hace un solo intento a la vez."""
     if tipo_conexion == "USB":
         return _abrir_captura(tipo_conexion, url_conexion)
 
     if not _servidor_alcanzable(url_conexion):
         return None
-
-    resultado = {}
-
-    def intentar():
-        resultado["cap"] = _abrir_captura(tipo_conexion, url_conexion)
-
-    hilo = threading.Thread(target=intentar, daemon=True)
-    hilo.start()
-    hilo.join(TIMEOUT_CONEXION_RTSP_SEG)
-    if hilo.is_alive():
-        return None
-    return resultado.get("cap")
+    return _abrir_captura(tipo_conexion, url_conexion)
 
 
 class CamaraThread(QThread):
@@ -159,9 +236,20 @@ class CamaraThread(QThread):
 
         self._buffer = deque(maxlen=BUFFER_SEGUNDOS * CAPTURA_FPS)
         self._baseline_brillo = None
+        self._baseline_bordes = None
+        self._lecturas_tapada = 0
         self._en_sabotaje = False
         self._ultimo_sabotaje = 0.0
         self._forzar_reconexion = False
+        # entrega a la UI "solo el ultimo frame": no se manda uno nuevo hasta
+        # que la interfaz pinto el anterior (ver confirmar_entrega). Sin esto
+        # las senales se encolaban sin limite cuando la UI iba mas lenta, el
+        # video se atrasaba y los avisos de sabotaje (misma cola) llegaban tarde
+        self._entrega_pendiente = False
+
+    def confirmar_entrega(self):
+        """La UI llama esto al terminar de pintar un frame de esta camara."""
+        self._entrega_pendiente = False
 
     def detener(self):
         self._activo = False
@@ -171,16 +259,39 @@ class CamaraThread(QThread):
         de un movimiento PTZ, cuando el video suele verse mas distorsionado)."""
         self._forzar_reconexion = True
 
+    # % de pixeles de borde (Canny) por debajo del cual la escena "perdio el
+    # detalle", relativo a su linea base: una camara tapada queda en ~0%
+    PROPORCION_BORDES_TAPADA = 0.2
+    BORDES_MINIMOS_PARA_COMPARAR = 0.5   # escena muy oscura/lisa: solo regla de brillo
+    LECTURAS_PARA_CONFIRMAR = 2          # 2 frames seguidos (~0.2s): evita falsos por un frame raro
+
     def _actualizar_sabotaje(self, frame):
         gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         brillo = float(gris.mean())
         desviacion = float(gris.std())
+        chico = cv2.resize(gris, (320, 240), interpolation=cv2.INTER_AREA)
+        bordes = float((cv2.Canny(cv2.GaussianBlur(chico, (5, 5), 0), 40, 120) > 0).mean() * 100)
 
         if self._baseline_brillo is None:
             self._baseline_brillo = brillo
+            self._baseline_bordes = bordes
             return
 
-        cambio_brusco = abs(brillo - self._baseline_brillo) > UMBRAL_SABOTAJE and desviacion < 28.0
+        # 1) regla original: cambio brusco de brillo + imagen uniforme (la
+        #    camara se pone negra, o la apuntan a una luz)
+        cambio_brillo = abs(brillo - self._baseline_brillo) > UMBRAL_SABOTAJE and desviacion < 28.0
+        # 2) perdida de detalle: las camaras analogicas/IP con ganancia
+        #    automatica (las del DVR) suben el brillo al taparlas y quedan en
+        #    un gris con ruido - la regla 1 no se cumplia (o tarde, solo el
+        #    instante antes de que la ganancia compensara). Los bordes, en
+        #    cambio, caen a ~0% apenas se tapa, sin importar la ganancia.
+        perdida_detalle = (
+            self._baseline_bordes >= self.BORDES_MINIMOS_PARA_COMPARAR
+            and bordes < self._baseline_bordes * self.PROPORCION_BORDES_TAPADA
+            and desviacion < 40.0
+        )
+        self._lecturas_tapada = self._lecturas_tapada + 1 if (cambio_brillo or perdida_detalle) else 0
+        cambio_brusco = self._lecturas_tapada >= self.LECTURAS_PARA_CONFIRMAR
         ahora = time.time()
         enfriamiento_activo = (ahora - self._ultimo_sabotaje) < 15.0
 
@@ -189,12 +300,13 @@ class CamaraThread(QThread):
             self._ultimo_sabotaje = ahora
             self.estado_cambiado.emit("sabotaje")
             self._exportar_evidencia_sabotaje()
-        elif not cambio_brusco:
+        elif self._lecturas_tapada == 0:
             if self._en_sabotaje:
                 self.estado_cambiado.emit("conectada")
             self._en_sabotaje = False
             # linea base lenta: se adapta a cambios normales de iluminacion
             self._baseline_brillo = 0.98 * self._baseline_brillo + 0.02 * brillo
+            self._baseline_bordes = 0.98 * self._baseline_bordes + 0.02 * bordes
 
     def _exportar_evidencia_sabotaje(self):
         frames = list(self._buffer)
@@ -288,8 +400,11 @@ class CamaraThread(QThread):
             ultimo_procesado = ahora
 
             self._buffer.append(frame.copy())
-            self.frame_listo.emit(frame)
+            # deteccion ANTES de pintar: el aviso sale apenas se ve tapada
             self._actualizar_sabotaje(frame)
+            if not self._entrega_pendiente:
+                self._entrega_pendiente = True
+                self.frame_listo.emit(frame)
 
         return "detenido"
 
@@ -404,7 +519,7 @@ class DeteccionCanalesDVRThread(QThread):
             puerto = urlparse(url_prueba).port or 554
             mensaje = _diagnostico_red(self.ip, puerto)
             if mensaje:
-                self.diagnostico.emit(mensaje)
+                self.diagnostico.emit(mensaje + _sugerencia_ip_alternativa(self.ip, puerto))
             self.resultado.emit([])
             return
 
@@ -424,4 +539,8 @@ class DeteccionCanalesDVRThread(QThread):
                     encontrados.append({"canal": canal, "url": url, "resolucion": f"{ancho}x{alto}"})
             finally:
                 captura.release()
+        if not encontrados:
+            mensaje = _diagnostico_credenciales(self.marca, self.ip, self.usuario, self.clave)
+            if mensaje:
+                self.diagnostico.emit(mensaje)
         self.resultado.emit(encontrados)

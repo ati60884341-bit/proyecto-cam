@@ -297,6 +297,17 @@ class DvrView(QWidget):
         if cantidad_canales < 1 or cantidad_canales > 64:
             QMessageBox.warning(self, "Dato invalido", "La cantidad de canales debe estar entre 1 y 64.")
             return
+        if not self.campo_clave.text():
+            # Hikvision/Dahua activados nunca aceptan clave vacia: sin esto se
+            # registraba igual y la deteccion fallaba con un generico "revise
+            # IP/usuario/clave" que no decia que la clave faltaba
+            QMessageBox.warning(
+                self, "Falta la clave",
+                "Escriba la clave del grabador (la misma con que entra al menu del DVR "
+                "o a su pagina web). Sin clave el DVR rechaza la conexion.",
+            )
+            self.campo_clave.setFocus()
+            return
         self.registrar_solicitado.emit({
             "nombre": nombre,
             "marca": self.campo_marca.currentText(),

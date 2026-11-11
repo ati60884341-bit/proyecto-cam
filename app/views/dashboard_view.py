@@ -121,6 +121,7 @@ class DashboardView(QWidget):
     ampliar_zona = pyqtSignal(str)
     reconectar_zona = pyqtSignal(str)
     deteccion_gesto_alternada = pyqtSignal(bool)
+    alarma_silenciada = pyqtSignal()
 
     def __init__(self, camaras, parent=None):
         super().__init__(parent)
@@ -185,6 +186,12 @@ class DashboardView(QWidget):
         btn_manual.clicked.connect(self._mostrar_manual)
         v.addWidget(btn_manual)
         panel_derecho.addWidget(grupo_voz)
+
+        # sirena de camara tapada: solo se habilita mientras esta sonando
+        self.btn_silenciar_alarma = QPushButton("Silenciar alarma")
+        self.btn_silenciar_alarma.setEnabled(False)
+        self.btn_silenciar_alarma.clicked.connect(self.alarma_silenciada.emit)
+        panel_derecho.addWidget(self.btn_silenciar_alarma)
 
         grupo_panico = QGroupBox("Modo panico silencioso")
         p = QVBoxLayout(grupo_panico)
@@ -313,3 +320,14 @@ class DashboardView(QWidget):
             )
         else:
             self.btn_confirmar.setStyleSheet("")
+
+    def set_alarma_sonando(self, sonando, zonas=()):
+        if sonando:
+            self.btn_silenciar_alarma.setText(f"SILENCIAR ALARMA - camara tapada: {', '.join(zonas)}")
+            self.btn_silenciar_alarma.setStyleSheet(
+                "background:#c0392b; color:white; font-weight:bold; border:2px solid #ff6b5b; padding:8px;"
+            )
+        else:
+            self.btn_silenciar_alarma.setText("Silenciar alarma")
+            self.btn_silenciar_alarma.setStyleSheet("")
+        self.btn_silenciar_alarma.setEnabled(sonando)
