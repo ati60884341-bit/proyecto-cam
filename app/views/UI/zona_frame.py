@@ -25,6 +25,7 @@ class ZonaFrame(QFrame):
     capturar_evidencia = pyqtSignal(str)   # nombre de zona
     ampliar_zona = pyqtSignal(str)
     reconectar_zona = pyqtSignal(str)
+    ocultar_zona = pyqtSignal(str)
 
     def __init__(self, nombre_zona, nombre_camara, parent=None):
         super().__init__(parent)
@@ -36,9 +37,22 @@ class ZonaFrame(QFrame):
 
         layout = QVBoxLayout(self)
 
+        fila_titulo = QHBoxLayout()
         self.titulo = QLabel(f"{nombre_zona}  —  {nombre_camara}")
         self.titulo.setStyleSheet("color: white; font-weight: bold;")
-        layout.addWidget(self.titulo)
+        fila_titulo.addWidget(self.titulo, stretch=1)
+        # suspende la camara (deja de conectarse y de verse) sin borrarla:
+        # se vuelve a mostrar desde el menu "Ocultas" de su grupo
+        self.btn_ocultar = QPushButton("Ocultar")
+        self.btn_ocultar.setToolTip(
+            "Suspende esta camara: deja de verse y de conectarse (libera la conexion "
+            "con el DVR/NVR). No detecta sabotaje mientras este oculta. Se vuelve a "
+            "mostrar desde el boton \"Ocultas\" de su grupo."
+        )
+        self.btn_ocultar.setFixedWidth(70)
+        self.btn_ocultar.clicked.connect(lambda: self.ocultar_zona.emit(self.nombre_zona))
+        fila_titulo.addWidget(self.btn_ocultar)
+        layout.addLayout(fila_titulo)
 
         self.video_label = QLabel("Conectando...")
         self.video_label.setStyleSheet("color: #aaa; background: black;")

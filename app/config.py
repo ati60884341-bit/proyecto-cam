@@ -48,7 +48,7 @@ IMAGENES_DIR = os.path.join(RECURSOS_DIR, "app", "recursos", "imagenes")
 
 # BUFFER_SEGUNDOS = segundos que guarda la "maquina del tiempo" antes de un sabotaje
 BUFFER_SEGUNDOS = 8
-CAPTURA_FPS = 10
+CAPTURA_FPS = 15  # lo que transmiten de verdad los DVR/NVR probados (a 10 se veia a saltos)
 UMBRAL_SABOTAJE = 35.0
 INTERVALO_FATIGA_SEG = 90
 TOLERANCIA_FATIGA_SEG = 15

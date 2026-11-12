@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 
 from app.views.UI.zona_frame import ZonaFrame
+from app.views.UI.grupo_grabador import GrupoGrabador
 from app.services.voice_service import listar_microfonos
 
 MANUAL_COMANDOS_INTRO_HTML = """
@@ -122,19 +123,27 @@ class DashboardView(QWidget):
     reconectar_zona = pyqtSignal(str)
     deteccion_gesto_alternada = pyqtSignal(bool)
     alarma_silenciada = pyqtSignal()
+    ocultar_zona = pyqtSignal(str)
+    mostrar_zona = pyqtSignal(str)
+
+    CLAVE_INDEPENDIENTES = "independientes"
 
     def __init__(self, camaras, parent=None):
         super().__init__(parent)
         self.zona_frames = {}
-        self._siguiente_posicion = 0
         self._columnas = 2
         self._zonas_con_ptz = []
+        # un bloque por grabador (DVR/NVR) + uno para camaras independientes
+        self._grupos = {}          # clave -> GrupoGrabador
+        self._grupo_de_zona = {}   # zona -> clave de grupo
+        self._titulos_grabador = {}  # IdDispositivo -> titulo (se mejora al identificar DVR/NVR)
 
         layout_raiz = QHBoxLayout(self)
 
-        # -------- panel izquierdo: zonas (QGridLayout de QFrame, dinamico) --------
+        # -------- panel izquierdo: zonas agrupadas por grabador --------
         self.panel_zonas = QWidget()
-        self.grid = QGridLayout(self.panel_zonas)
+        self.layout_grupos = QVBoxLayout(self.panel_zonas)
+        self.layout_grupos.addStretch(1)
         for camara in camaras:
             # una tarjeta por ZONA, nunca por camara: si la lista inicial
             # trae mas de una camara activa para la misma zona (pasa si
@@ -227,41 +236,93 @@ class DashboardView(QWidget):
 
         layout_raiz.addWidget(panel_derecho_widget)
 
+    # ---------------- grupos por grabador ----------------
+    @staticmethod
+    def titulo_grabador(camara, tipo="Grabador", modelo=None):
+        detalle = " · ".join(x for x in (camara.get("DispositivoMarca"), modelo, camara.get("DispositivoIP")) if x)
+        return f"{tipo} \"{camara.get('Dispositivo') or 'sin nombre'}\"" + (f"  —  {detalle}" if detalle else "")
+
+    def _clave_grupo(self, camara):
+        return camara.get("IdDispositivo") or self.CLAVE_INDEPENDIENTES
+
+    def _obtener_grupo(self, camara):
+        clave = self._clave_grupo(camara)
+        grupo = self._grupos.get(clave)
+        if grupo:
+            return grupo
+        if clave == self.CLAVE_INDEPENDIENTES:
+            titulo = "Camaras independientes (USB / IP sueltas)"
+        else:
+            titulo = self._titulos_grabador.get(clave) or self.titulo_grabador(camara)
+        grupo = GrupoGrabador(titulo, self._columnas)
+        grupo.mostrar_zona.connect(self.mostrar_zona.emit)
+        self._grupos[clave] = grupo
+        # independientes primero; los grabadores en orden de registro
+        claves = sorted(self._grupos, key=lambda k: (k != self.CLAVE_INDEPENDIENTES, k if isinstance(k, int) else 0))
+        self.layout_grupos.insertWidget(claves.index(clave), grupo)
+        return grupo
+
+    def actualizar_titulo_grabador(self, id_dispositivo, titulo):
+        """El controlador lo llama al identificar si el equipo es DVR o NVR."""
+        self._titulos_grabador[id_dispositivo] = titulo
+        grupo = self._grupos.get(id_dispositivo)
+        if grupo:
+            grupo.set_titulo(titulo)
+
     # ---------------- zonas / camaras ----------------
     def _agregar_tile(self, camara):
         zf = ZonaFrame(camara["Zona"], camara["Nombre"])
         zf.capturar_evidencia.connect(self.capturar_evidencia.emit)
         zf.ampliar_zona.connect(self.ampliar_zona.emit)
         zf.reconectar_zona.connect(self.reconectar_zona.emit)
-        fila, columna = divmod(self._siguiente_posicion, self._columnas)
-        self.grid.addWidget(zf, fila, columna)
-        self._siguiente_posicion += 1
+        zf.ocultar_zona.connect(self.ocultar_zona.emit)
+        self._obtener_grupo(camara).agregar_tile(zf)
+        self._grupo_de_zona[camara["Zona"]] = self._clave_grupo(camara)
         self.zona_frames[camara["Zona"]] = zf
         return zf
 
     def agregar_zona_frame(self, camara):
         """Usado por el controlador al agregar una camara nueva (cualquier
-        marca). Si la zona ya tenia un tile, se reutiliza (se reemplaza la
-        camara que alimenta ese recuadro, incluso si estaba quitada); si es
-        una zona nueva, se agrega un recuadro nuevo a la grilla."""
+        marca). Si la zona ya tenia un recuadro en el MISMO grupo se reutiliza;
+        si cambio de grabador (o es nueva) se crea en el grupo que corresponde."""
         existente = self.zona_frames.get(camara["Zona"])
-        if existente:
+        if existente and self._grupo_de_zona.get(camara["Zona"]) == self._clave_grupo(camara):
             existente.titulo.setText(f"{camara['Zona']}  —  {camara['Nombre']}")
             existente.video_label.setText("Conectando...")
             existente._set_botones_habilitados(True)
+            self._grupos[self._clave_grupo(camara)].set_oculta(camara["Zona"], False)
             return existente
+        if existente:
+            self.quitar_zona_frame(camara["Zona"])
         return self._agregar_tile(camara)
 
     def quitar_zona_frame(self, zona):
         """Borra el recuadro de la zona por completo del Centro de
-        Monitoreo (no lo deja marcado como "CAMARA QUITADA"): al volver a
-        agregar una camara a esa misma zona, _agregar_tile() crea un
-        recuadro nuevo, como si nunca hubiera habido nada ahi."""
+        Monitoreo (no lo deja marcado como "CAMARA QUITADA"); si su grupo
+        queda vacio (ej. se quito el grabador entero) el grupo tambien se va."""
         tile = self.zona_frames.pop(zona, None)
+        clave = self._grupo_de_zona.pop(zona, None)
+        grupo = self._grupos.get(clave)
+        if tile and grupo:
+            grupo.quitar_tile(tile)
         if tile:
-            self.grid.removeWidget(tile)
             tile.setParent(None)
             tile.deleteLater()
+        if grupo and grupo.cantidad() == 0:
+            self._grupos.pop(clave, None)
+            self.layout_grupos.removeWidget(grupo)
+            grupo.setParent(None)
+            grupo.deleteLater()
+
+    def set_zona_oculta(self, zona, oculta):
+        grupo = self._grupos.get(self._grupo_de_zona.get(zona))
+        if grupo:
+            grupo.set_oculta(zona, oculta)
+        tile = self.zona_frames.get(zona)
+        if tile and not oculta:
+            tile.video_label.clear()
+            tile.video_label.setText("Conectando...")
+            tile.estado_label.setText("Estado: conectando...")
 
     def _emitir_comando_manual(self):
         texto = self.campo_comando.text().strip()

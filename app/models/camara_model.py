@@ -7,10 +7,15 @@ def listar(incluir_inactivas=False):
     la pestana Camaras, para que el administrador pueda agregar una nueva
     de una vez. incluir_inactivas=True es para auditoria/depuracion."""
     filtro = "" if incluir_inactivas else "WHERE c.Estado = N'Activa'"
+    # IdDispositivo/Canal/Dispositivo*: a que DVR/NVR pertenece la camara (NULL
+    # si es independiente) - el Centro de Monitoreo las agrupa por grabador
     return query(
         "SELECT c.IdCamara, c.IdZona, z.Nombre AS Zona, c.Nombre, c.Marca, c.TipoConexion, c.UrlConexion, "
-        "c.Estado, c.TienePTZ "
-        f"FROM cam.Camaras c JOIN cam.Zonas z ON z.IdZona = c.IdZona {filtro} ORDER BY c.IdZona"
+        "c.Estado, c.TienePTZ, c.IdDispositivo, c.Canal, "
+        "d.Nombre AS Dispositivo, d.Marca AS DispositivoMarca, d.IP AS DispositivoIP "
+        "FROM cam.Camaras c JOIN cam.Zonas z ON z.IdZona = c.IdZona "
+        f"LEFT JOIN cam.DispositivosDVR d ON d.IdDispositivo = c.IdDispositivo {filtro} "
+        "ORDER BY c.IdDispositivo, c.Canal, c.IdZona"
     )
 
 

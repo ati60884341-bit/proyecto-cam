@@ -20,8 +20,12 @@ from app.config import BUFFER_SEGUNDOS, CAPTURA_FPS, UMBRAL_SABOTAJE, EVIDENCIAS
 
 TIMEOUT_CONEXION_RTSP_SEG = 4.0
 LECTURAS_FALLIDAS_PARA_RECONECTAR = 40  # ~2s de lecturas fallidas seguidas -> reconectar
-RESINCRONIZACION_PERIODICA_SEG = 120    # reconexion preventiva: limita cuanto se acumula
-                                         # la corrupcion H.264 entre fotogramas clave (I-frames)
+RESINCRONIZACION_PERIODICA_SEG = 600    # reconexion preventiva: limita cuanto se acumula
+                                         # la corrupcion H.264 entre fotogramas clave (I-frames).
+                                         # Era 120 s: cada reconexion congela ~1.5 s la imagen,
+                                         # y el atraso ahora lo vigila ATRASO_MAXIMO_SEG
+ATRASO_MAXIMO_SEG = 1.5                 # si el video va mas de esto detras del tiempo real, se resincroniza
+CALIDAD_JPEG_BUFFER = 85                # "maquina del tiempo" comprimida (ver CamaraThread._buffer)
 
 
 def _abrir_captura(tipo_conexion, url_conexion):
@@ -234,7 +238,11 @@ class CamaraThread(QThread):
         self.url_conexion = url_conexion
         self._activo = True
 
+        # los ultimos BUFFER_SEGUNDOS en JPEG, no en crudo: un frame 1080p
+        # crudo pesa 6.2 MB (8 s = ~500 MB por camara, la app llego a 1.1 GB
+        # con 2 camaras); en JPEG son ~325 KB (~26 MB por camara)
         self._buffer = deque(maxlen=BUFFER_SEGUNDOS * CAPTURA_FPS)
+        self._ultimo_frame = None
         self._baseline_brillo = None
         self._baseline_bordes = None
         self._lecturas_tapada = 0
@@ -309,7 +317,7 @@ class CamaraThread(QThread):
             self._baseline_bordes = 0.98 * self._baseline_bordes + 0.02 * bordes
 
     def _exportar_evidencia_sabotaje(self):
-        frames = list(self._buffer)
+        frames = [f for f in (cv2.imdecode(j, cv2.IMREAD_COLOR) for j in list(self._buffer)) if f is not None]
         if not frames:
             return
         marca_tiempo = time.strftime("%Y%m%d_%H%M%S")
@@ -371,6 +379,11 @@ class CamaraThread(QThread):
         ultimo_procesado = 0.0
         inicio_transmision = time.time()
         es_rtsp = self.tipo_conexion != "USB"
+        # vigilancia de atraso: reloj de la PC menos marca de tiempo del video
+        # (PTS). Si la PC lee mas lento de lo que el grabador transmite (CPU
+        # ocupada, muchas camaras 1080p), esa diferencia crece; se toma como
+        # referencia el punto de menor diferencia (el mas "al dia")
+        deriva_minima = None
 
         while self._activo:
             # se lee SIN pausa, tan rapido como llegan los frames: en RTSP esto
@@ -395,13 +408,26 @@ class CamaraThread(QThread):
                 return "resync"  # reconexion preventiva: pide un I-frame nuevo
 
             ahora = time.time()
+            if es_rtsp:
+                pts = captura.get(cv2.CAP_PROP_POS_MSEC)
+                if pts and pts > 0:
+                    deriva = ahora - pts / 1000.0
+                    if deriva_minima is None or deriva < deriva_minima:
+                        deriva_minima = deriva
+                    elif deriva - deriva_minima > ATRASO_MAXIMO_SEG and ahora - inicio_transmision > 5:
+                        # se quedo atras: reconectar entrega de nuevo el video en vivo
+                        return "resync"
+
             if ahora - ultimo_procesado < intervalo:
                 continue
             ultimo_procesado = ahora
 
-            self._buffer.append(frame.copy())
-            # deteccion ANTES de pintar: el aviso sale apenas se ve tapada
+            self._ultimo_frame = frame
+            # deteccion ANTES de pintar y de comprimir: el aviso sale apenas se ve tapada
             self._actualizar_sabotaje(frame)
+            ok_jpg, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, CALIDAD_JPEG_BUFFER])
+            if ok_jpg:
+                self._buffer.append(jpg)
             if not self._entrega_pendiente:
                 self._entrega_pendiente = True
                 self.frame_listo.emit(frame)
@@ -409,9 +435,9 @@ class CamaraThread(QThread):
         return "detenido"
 
     def capturar_snapshot(self):
-        if self._buffer:
-            return self._buffer[-1].copy()
-        return None
+        # el ultimo frame en crudo (calidad completa, sin pasar por JPEG)
+        frame = self._ultimo_frame
+        return frame.copy() if frame is not None else None
 
 
 class DeteccionCamarasUSBThread(QThread):

@@ -151,6 +151,10 @@ class DvrController:
                 "Nombre": f"{nombre_dispositivo}-Canal{canal}", "Marca": marca,
                 "TipoConexion": "RTSP", "UrlConexion": canal_info["url"], "Estado": "Activa",
                 "TienePTZ": tiene_ptz,
+                # para agruparla bajo su grabador en el Centro de Monitoreo
+                "IdDispositivo": id_dispositivo, "Canal": canal,
+                "Dispositivo": nombre_dispositivo, "DispositivoMarca": marca,
+                "DispositivoIP": dispositivo["IP"] if dispositivo else None,
             }
             self.on_camara_agregada(camara_completa)
 

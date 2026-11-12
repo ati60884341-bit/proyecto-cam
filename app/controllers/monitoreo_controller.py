@@ -2,12 +2,13 @@ import os
 import threading
 import time
 
-from PyQt6.QtCore import QTimer, QObject, pyqtSignal
+from PyQt6.QtCore import QTimer, QObject, QSettings, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 
 from app.config import EVIDENCIAS_DIR
-from app.models import zona_model, incidencia_model, evidencia_model, fatiga_model, comando_model
+from app.models import zona_model, incidencia_model, evidencia_model, fatiga_model, comando_model, dispositivo_dvr_model
 from app.services.camera_service import CamaraThread
+from app.services.grabador_info import IdentificarGrabadoresThread
 from app.services.hash_service import firmar_archivo
 from app.services.fatiga_service import AuditorFatiga
 from app.services.voice_service import AsistenteVozThread, interpretar_comando, hablar, registrar_zona, normalizar
@@ -57,6 +58,18 @@ class MonitoreoController:
         self.view.panico_manual.connect(self.activar_panico)
         self.view.fatiga_confirmada.connect(self._confirmar_fatiga)
         self.view.alarma_silenciada.connect(lambda: self._silenciar_alarma("silenciada por el vigilante"))
+        self.view.ocultar_zona.connect(self.ocultar_camara)
+        self.view.mostrar_zona.connect(self.mostrar_camara)
+
+        # camaras suspendidas ("Ocultar"): no se conectan ni se ven. Se guarda
+        # por IdCamara en la configuracion de ESTA PC (QSettings), no en la
+        # base: cada puesto de monitoreo decide que quiere ver sin cambiarle
+        # nada a los demas, y no hace falta tocar el esquema de la BD
+        self._ajustes = QSettings("ProyectoCAM", "CentroMonitoreo")
+        self._ids_ocultos = self._leer_ids_ocultos()
+        self._zonas_ocultas = {c["Zona"] for c in camaras if c["IdCamara"] in self._ids_ocultos}
+        for zona in self._zonas_ocultas:
+            self.view.set_zona_oculta(zona, True)
 
         # sirena de camara tapada: suena mientras haya alguna zona en
         # sabotaje; se apaga sola al destaparlas, con el boton, o al llegar
@@ -83,7 +96,10 @@ class MonitoreoController:
         # con el arranque de las camaras ni gasta CPU/RAM de mas por defecto.
         self._proximo_arranque_disponible = 0.0
         for camara in camaras:
+            if camara["Zona"] in self._zonas_ocultas:
+                continue  # suspendida: ni se conecta (no ocupa conexion del DVR ni CPU)
             self._programar_arranque_nativo(lambda c=camara: self._iniciar_hilo_camara(c))
+        self._identificar_grabadores()
 
         self.fatiga = AuditorFatiga()
         self.fatiga.pedir_confirmacion.connect(self._pedir_confirmacion_fatiga)
@@ -173,13 +189,20 @@ class MonitoreoController:
     # ---------------- alta de camaras (cualquier marca) ----------------
     def _iniciar_hilo_camara(self, camara):
         zona = camara["Zona"]
+        # el arranque se programa con retraso (cola nativa): para cuando le
+        # toca, la camara pudo haberse ocultado, quitado o reemplazado
+        actual = self.camaras_por_zona.get(zona)
+        if zona in self._zonas_ocultas or not actual or actual["IdCamara"] != camara["IdCamara"]:
+            return None
+        hilo_anterior = self.hilos_camara.get(zona)
+        if hilo_anterior and hilo_anterior.id_camara == camara["IdCamara"] and hilo_anterior.isRunning():
+            return hilo_anterior  # ya esta corriendo (ej. Mostrar pulsado dos veces)
         self.factor_zoom.setdefault(zona, 1.0)
 
         # si ya habia un hilo corriendo para esta zona (ej. dos camaras
         # registradas en la misma zona), se detiene antes de arrancar el
         # nuevo: evita dos hilos nativos (FFmpeg) compitiendo por el mismo
         # recuadro, lo que en la practica resulto inestable
-        hilo_anterior = self.hilos_camara.get(zona)
         if hilo_anterior:
             self._retirar_hilo(hilo_anterior)
 
@@ -221,6 +244,11 @@ class MonitoreoController:
         zona = camara["Zona"]
 
         self.camaras_por_zona[zona] = camara
+        # una camara recien agregada siempre se muestra
+        self._zonas_ocultas.discard(zona)
+        if camara["IdCamara"] in self._ids_ocultos:
+            self._ids_ocultos.discard(camara["IdCamara"])
+            self._guardar_ids_ocultos()
         if zona not in self.zonas_por_nombre:
             zona_info = zona_model.obtener_por_nombre(zona)
             if zona_info:
@@ -233,6 +261,8 @@ class MonitoreoController:
         self.view.registrar_evento(
             f"[CAMARA] Nueva camara en {zona}: {camara['Nombre']} ({camara['Marca']}, {camara['TipoConexion']})."
         )
+        if camara.get("IdDispositivo"):
+            self._identificar_grabadores([camara["IdDispositivo"]])
 
     def quitar_camara(self, zona):
         """Detiene la camara y borra la zona por completo del Centro de
@@ -241,8 +271,13 @@ class MonitoreoController:
         hilo = self.hilos_camara.pop(zona, None)
         if hilo:
             self._retirar_hilo(hilo)
-        self.camaras_por_zona.pop(zona, None)
+        camara = self.camaras_por_zona.pop(zona, None)
         self.factor_zoom.pop(zona, None)
+        self._zonas_ocultas.discard(zona)
+        if camara and camara["IdCamara"] in self._ids_ocultos:
+            self._ids_ocultos.discard(camara["IdCamara"])
+            self._guardar_ids_ocultos()
+        self._quitar_de_alarma(zona)
 
         dialogo = self.dialogos_ampliados.pop(zona, None)
         if dialogo:
@@ -252,6 +287,88 @@ class MonitoreoController:
         self.view.quitar_zona_frame(zona)
         self._actualizar_manual_ptz()
         self.view.registrar_evento(f"[CAMARA] Camara de {zona} quitada por el administrador.")
+
+    # ---------------- ocultar / mostrar (suspender) camaras ----------------
+    def _leer_ids_ocultos(self):
+        valor = self._ajustes.value("camaras_ocultas", [])
+        if isinstance(valor, str):  # QSettings devuelve str si la lista tenia un solo elemento
+            valor = [valor]
+        ids = set()
+        for v in valor or []:
+            try:
+                ids.add(int(v))
+            except (TypeError, ValueError):
+                pass
+        return ids
+
+    def _guardar_ids_ocultos(self):
+        self._ajustes.setValue("camaras_ocultas", [str(i) for i in sorted(self._ids_ocultos)])
+
+    def ocultar_camara(self, zona):
+        """Suspende la camara: corta su conexion (libera el canal del
+        DVR/NVR y la CPU de decodificar) y la saca de la grilla. Si estaba en
+        alarma por sabotaje, esa zona deja de contar para la sirena."""
+        camara = self.camaras_por_zona.get(zona)
+        if not camara or zona in self._zonas_ocultas:
+            return
+        self._zonas_ocultas.add(zona)
+        self._ids_ocultos.add(camara["IdCamara"])
+        self._guardar_ids_ocultos()
+
+        hilo = self.hilos_camara.pop(zona, None)
+        if hilo:
+            self._retirar_hilo(hilo)
+        dialogo = self.dialogos_ampliados.get(zona)
+        if dialogo:
+            dialogo.close()
+        self._quitar_de_alarma(zona)
+        self.view.set_zona_oculta(zona, True)
+        self.view.registrar_evento(
+            f"[CAMARA] {zona} oculta: suspendida (no se ve ni detecta sabotaje). "
+            "Para verla de nuevo use el boton \"Ocultas\" de su grupo."
+        )
+
+    def mostrar_camara(self, zona):
+        camara = self.camaras_por_zona.get(zona)
+        if not camara or zona not in self._zonas_ocultas:
+            return
+        self._zonas_ocultas.discard(zona)
+        self._ids_ocultos.discard(camara["IdCamara"])
+        self._guardar_ids_ocultos()
+        self.view.set_zona_oculta(zona, False)
+        self._programar_arranque_nativo(lambda c=camara: self._iniciar_hilo_camara(c))
+        self.view.registrar_evento(f"[CAMARA] {zona} visible de nuevo, reconectando...")
+
+    def _quitar_de_alarma(self, zona):
+        if zona in self._zonas_en_sabotaje:
+            self._zonas_en_sabotaje.discard(zona)
+            if not self._zonas_en_sabotaje:
+                self._silenciar_alarma(f"{zona} ya no esta en monitoreo")
+            elif self._alarma_sonando:
+                self.view.set_alarma_sonando(True, sorted(self._zonas_en_sabotaje))
+
+    # ---------------- titulo DVR / NVR de cada grupo ----------------
+    def _identificar_grabadores(self, ids=None):
+        """Pregunta en segundo plano a cada grabador su modelo, para titular
+        su grupo como DVR o NVR (ej. 'NVR "angel" — Dahua · DHI-NVR1108HS').
+        Si no responde, el grupo queda como 'Grabador'."""
+        ids = set(ids) if ids else {c["IdDispositivo"] for c in self.camaras_por_zona.values() if c.get("IdDispositivo")}
+        dispositivos = [d for d in (dispositivo_dvr_model.obtener(i) for i in ids) if d]
+        if not dispositivos:
+            return
+        hilos = self.__dict__.setdefault("_hilos_identificacion", [])
+        hilo = IdentificarGrabadoresThread(dispositivos)
+        hilo.identificado.connect(self._grabador_identificado)
+        hilo.finished.connect(lambda h=hilo: h in hilos and hilos.remove(h))
+        hilos.append(hilo)
+        hilo.start()
+
+    def _grabador_identificado(self, id_dispositivo, tipo, modelo):
+        camara = next((c for c in self.camaras_por_zona.values() if c.get("IdDispositivo") == id_dispositivo), None)
+        if camara:
+            self.view.actualizar_titulo_grabador(
+                id_dispositivo, self.view.titulo_grabador(camara, tipo, modelo or None)
+            )
 
     def reconectar_camara(self, zona):
         """Fuerza una reconexion manual (resincroniza el video de inmediato)."""
@@ -302,6 +419,8 @@ class MonitoreoController:
             self.view.lbl_estado_gesto.setText("Deteccion de gesto: activa (sin manos arriba)")
 
     def _on_estado(self, zona, estado):
+        if zona in self._zonas_ocultas:
+            return  # aviso rezagado de un hilo ya suspendido
         zf = self.view.zona_widget(zona)
         if zf:
             zf.actualizar_estado(estado)
@@ -398,6 +517,9 @@ class MonitoreoController:
 
     # ---------------- ampliar zona ----------------
     def ampliar_zona(self, zona):
+        if zona in self._zonas_ocultas:
+            self.view.registrar_evento(f"{zona} esta oculta: muestrela primero desde \"Ocultas\" de su grupo.")
+            return
         dialogo = self.dialogos_ampliados.get(zona)
         if dialogo is None:
             dialogo = ZonaAmpliadaDialog(zona, self.view)
