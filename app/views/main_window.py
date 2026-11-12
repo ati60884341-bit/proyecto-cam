@@ -13,6 +13,7 @@ from app.views.camaras_view import CamarasView
 from app.views.dvr_view import DvrView
 from app.views.radar_view import RadarView
 from app.views.alertas_view import AlertasView
+from app.views.inicio_view import InicioView
 from app.views.manuales_view import ManualesView
 from app.views.UI.pantalla import tamano_adaptado
 from app.views.UI.fondo_nocturno import FondoNocturno
@@ -84,6 +85,7 @@ class MainWindow(QMainWindow):
 
         self.botones = {}
         for clave, texto in [
+            ("inicio", "Inicio"),
             ("dashboard", "Centro de monitoreo"),
             ("incidencias", "Incidencias"),
             ("evidencias", "Evidencias"),
@@ -113,6 +115,7 @@ class MainWindow(QMainWindow):
 
         # -------- contenido (QStackedWidget) --------
         self.stack = QStackedWidget()
+        self.inicio_view = InicioView(usuario)
         self.dashboard_view = DashboardView(camaras)
         self.incidencias_view = IncidenciasView()
         self.evidencias_view = EvidenciasView()
@@ -126,6 +129,7 @@ class MainWindow(QMainWindow):
         self.manuales_view = ManualesView()
 
         for clave, vista in [
+            ("inicio", self.inicio_view),
             ("dashboard", self.dashboard_view),
             ("incidencias", self.incidencias_view),
             ("evidencias", self.evidencias_view),
@@ -144,7 +148,7 @@ class MainWindow(QMainWindow):
         self._seccion_actual = None
         self._animacion_indicador = None
         self._animacion_fade = None
-        self.mostrar_seccion("dashboard")
+        self.mostrar_seccion("inicio")
         # al construirse, los botones del sidebar todavia no tienen una
         # geometria real (no hubo layout ni se mostro la ventana): se ubica
         # el indicador una vez que el bucle de eventos ya hizo ese primer
@@ -153,6 +157,7 @@ class MainWindow(QMainWindow):
 
     def mostrar_seccion(self, clave):
         vistas = {
+            "inicio": self.inicio_view,
             "dashboard": self.dashboard_view,
             "incidencias": self.incidencias_view,
             "evidencias": self.evidencias_view,

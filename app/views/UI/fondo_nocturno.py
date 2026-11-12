@@ -128,6 +128,8 @@ class FondoNocturno(QFrame):
         super().showEvent(event)
         if self._pelicula is not None and self._pelicula.state() != QMovie.MovieState.Running:
             self._pelicula.start()
+        if self.animado and not self._temporizador.isActive():
+            self._temporizador.start(self.INTERVALO_TIMER_MS)
 
     def hideEvent(self, event):
         super().hideEvent(event)
@@ -136,6 +138,8 @@ class FondoNocturno(QFrame):
         # sesion, aunque la ventana ya no se vea
         if self._pelicula is not None:
             self._pelicula.stop()
+        if self.animado:
+            self._temporizador.stop()
 
     def _pixmap_estatico_para(self, tamano):
         """Usado solo cuando animado=False (sidebar): con cache, porque la
@@ -149,16 +153,19 @@ class FondoNocturno(QFrame):
         return self._pixmap_recortado
 
     def _pixmap_cuadro_actual(self, tamano):
-        """Usado cuando animado=True: cada cuadro del GIF es distinto, asi
-        que no se puede cachear por tamano como en el caso quieto."""
-        fuente = None
-        if self._pelicula is not None:
-            fuente = self._pelicula.currentPixmap()
-        if fuente is None or fuente.isNull():
-            fuente = _cargar_pixmap_estatico()
+        """Usado cuando animado=True: se guarda solo el ultimo cuadro escalado.
+        Las estrellas repintan ~16 veces por segundo y el GIF cambia menos:
+        reescalar el mismo cuadro a pantalla completa cada vez era lo caro."""
+        if self._pelicula is None:
+            return self._pixmap_estatico_para(tamano)
+        clave = (self._pelicula.currentFrameNumber(), tamano.width(), tamano.height())
+        if getattr(self, "_cache_cuadro", (None, None))[0] == clave:
+            return self._cache_cuadro[1]
+        fuente = self._pelicula.currentPixmap()
         if fuente.isNull():
-            return None
-        return _recortar_a_tamano(fuente, tamano)
+            return self._pixmap_estatico_para(tamano)
+        self._cache_cuadro = (clave, _recortar_a_tamano(fuente, tamano))
+        return self._cache_cuadro[1]
 
     def paintEvent(self, event):
         pintor = QPainter(self)

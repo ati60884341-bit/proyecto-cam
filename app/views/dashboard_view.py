@@ -181,7 +181,9 @@ class DashboardView(QWidget):
 
         grupo_panico = QGroupBox("Modo panico silencioso")
         p = QVBoxLayout(grupo_panico)
-        p.addWidget(QLabel("Gesto: una o ambas manos arriba, 3 segundos, frente a la webcam."))
+        lbl_gesto = QLabel("Gesto: una o ambas manos arriba, 3 segundos, frente a la webcam.")
+        lbl_gesto.setWordWrap(True)
+        p.addWidget(lbl_gesto)
         self.chk_gesto = QCheckBox("Activar deteccion de gesto (usa mas CPU/RAM)")
         self.chk_gesto.toggled.connect(self.deteccion_gesto_alternada.emit)
         p.addWidget(self.chk_gesto)
@@ -208,10 +210,19 @@ class DashboardView(QWidget):
         r = QVBoxLayout(grupo_registro)
         self.texto_log = QTextEdit()
         self.texto_log.setReadOnly(True)
+        self.texto_log.setMinimumHeight(110)
         r.addWidget(self.texto_log)
         panel_derecho.addWidget(grupo_registro, stretch=1)
 
-        layout_raiz.addWidget(panel_derecho_widget)
+        # con desplazamiento: en pantallas bajas (laptop al 125%) Qt aplastaba
+        # los grupos y el boton del microfono quedaba encima de su texto
+        desplazable_derecho = QScrollArea()
+        desplazable_derecho.setWidgetResizable(True)
+        desplazable_derecho.setFrameShape(QScrollArea.Shape.NoFrame)
+        desplazable_derecho.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        desplazable_derecho.setWidget(panel_derecho_widget)
+        desplazable_derecho.setFixedWidth(ANCHO_MAXIMO_PANEL_DERECHO + 14)
+        layout_raiz.addWidget(desplazable_derecho)
 
     # ---------------- grupos por grabador ----------------
     @staticmethod

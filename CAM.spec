@@ -32,6 +32,7 @@ datas += [
 hiddenimports = [
     "pyttsx3.drivers",
     "pyttsx3.drivers.sapi5",
+    "PyQt6.QtMultimedia",  # la sirena (alarma_service) la carga dentro de una funcion
 ]
 
 a = Analysis(

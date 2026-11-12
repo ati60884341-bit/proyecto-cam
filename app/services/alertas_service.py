@@ -1,8 +1,26 @@
 """Manda una alerta con foto al celular: WhatsApp primero y, si no se puede,
 Telegram de respaldo, para que ninguna alerta se pierda."""
 import threading
+import time
 
 from app.services import telegram_service, whatsapp_service
+
+
+def estado():
+    """(tipo, frase) de por donde llegan hoy las alertas; tipo: ok | aviso | error."""
+    cfg = whatsapp_service.cargar_config()
+    hasta = whatsapp_service.ventana_abierta_hasta(cfg)
+    hay_telegram = telegram_service.configurado()
+    if cfg["activo"] and whatsapp_service.configurado(cfg) and hasta:
+        return "ok", f"Listo: las alertas llegan por WhatsApp hasta el {time.strftime('%d/%m %H:%M', time.localtime(hasta))}."
+    if not cfg["activo"] or not whatsapp_service.configurado(cfg):
+        motivo = "WhatsApp desactivado" if whatsapp_service.configurado(cfg) else "Falta conectar WhatsApp (paso 1)"
+        if hay_telegram:
+            return "aviso", f"{motivo}: por ahora las alertas llegan por Telegram."
+        return "error", f"{motivo} y Telegram no esta configurado: las alertas NO llegan."
+    if hay_telegram:
+        return "aviso", "Conversacion de WhatsApp cerrada (paso 2): mientras tanto llegan por Telegram."
+    return "error", "Conversacion de WhatsApp cerrada (paso 2) y sin Telegram: las alertas NO llegan."
 
 
 def enviar_alerta(ruta_foto, texto):

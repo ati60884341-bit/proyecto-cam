@@ -7,7 +7,7 @@ import numpy as np
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from app.config import EVIDENCIAS_DIR
-from app.services import telegram_service, whatsapp_service
+from app.services import alertas_service, whatsapp_service
 from app.services.hash_service import firmar_archivo
 
 
@@ -46,19 +46,7 @@ class AlertasController:
         else:
             self.view.set_ventana("Cerrada: escribale \"inicio turno\" al bot", False)
 
-        hay_telegram = telegram_service.configurado()
-        if cfg["activo"] and whatsapp_service.configurado(cfg) and hasta:
-            self.view.set_estado("ok", f"Listo: las alertas llegan por WhatsApp hasta el {hora_cierre}.")
-        elif not cfg["activo"] or not whatsapp_service.configurado(cfg):
-            motivo = "WhatsApp desactivado" if whatsapp_service.configurado(cfg) else "Falta conectar WhatsApp (paso 1)"
-            if hay_telegram:
-                self.view.set_estado("aviso", f"{motivo}: por ahora las alertas llegan por Telegram.")
-            else:
-                self.view.set_estado("error", f"{motivo} y Telegram no esta configurado: las alertas NO llegan.")
-        elif hay_telegram:
-            self.view.set_estado("aviso", "Conversacion de WhatsApp cerrada (paso 2): mientras tanto llegan por Telegram.")
-        else:
-            self.view.set_estado("error", "Conversacion de WhatsApp cerrada (paso 2) y sin Telegram: las alertas NO llegan.")
+        self.view.set_estado(*alertas_service.estado())
 
     def guardar(self, datos):
         if not (datos["token"] and datos["phone_id"] and datos["numero"]):

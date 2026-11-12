@@ -107,6 +107,8 @@ class ZonaFrame(QFrame):
         self.lbl_voz.setText(f'Por voz: "camara {numero}"')
 
     def mostrar_frame(self, frame_bgr):
+        if not self.isVisible():
+            return  # otra pestana a la vista: escalar y convertir el cuadro seria trabajo perdido
         self.video_label.setPixmap(frame_a_pixmap(frame_bgr, self.video_label))
 
     def actualizar_estado(self, estado):

@@ -10,6 +10,7 @@ from app.controllers.dvr_controller import DvrController
 from app.controllers.radar_controller import RadarController
 from app.controllers.telegram_controller import TelegramController
 from app.controllers.alertas_controller import AlertasController
+from app.controllers.inicio_controller import InicioController
 
 
 class AppController:
@@ -49,6 +50,10 @@ class AppController:
         )
         self.telegram_controller = TelegramController(self.main_window.telegram_view)
         self.alertas_controller = AlertasController(self.main_window.alertas_view)
+        self.inicio_controller = InicioController(
+            self.main_window.inicio_view, self.monitoreo_controller,
+            ir_a_monitoreo=lambda: self.main_window.mostrar_seccion("dashboard"),
+        )
 
     def show(self):
         self.main_window.show()

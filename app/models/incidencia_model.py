@@ -1,4 +1,4 @@
-from app.database.conexion_bd import query, execute
+from app.database.conexion_bd import query, query_one, execute
 
 
 def crear(id_zona, tipo, descripcion, id_camara=None, id_turno=None, severidad="Normal"):
@@ -43,3 +43,8 @@ def conteo_por_zona():
         "SELECT z.Nombre AS Zona, COUNT(*) AS Total FROM cam.Incidencias i "
         "JOIN cam.Zonas z ON z.IdZona = i.IdZona GROUP BY z.Nombre ORDER BY Total DESC"
     )
+
+
+def contar_hoy():
+    fila = query_one("SELECT COUNT(*) AS Total FROM cam.Incidencias WHERE CAST(FechaHora AS DATE) = CAST(SYSDATETIME() AS DATE)")
+    return fila["Total"] if fila else 0

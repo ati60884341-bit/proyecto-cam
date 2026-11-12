@@ -1,6 +1,7 @@
 import os
 import socket
 import subprocess
+import threading
 import time
 from collections import deque
 from urllib.parse import urlparse
@@ -271,6 +272,7 @@ class CamaraThread(QThread):
         self._lecturas_tapada = 0
         self._en_sabotaje = False
         self._ultimo_sabotaje = 0.0
+        self._aprender_desde = 0.0
         self._forzar_reconexion = False
         # entrega a la UI "solo el ultimo frame": no se manda uno nuevo hasta
         # que la interfaz pinto el anterior (ver confirmar_entrega). Sin esto
@@ -295,8 +297,22 @@ class CamaraThread(QThread):
     PROPORCION_BORDES_TAPADA = 0.2
     BORDES_MINIMOS_PARA_COMPARAR = 0.5   # escena muy oscura/lisa: solo regla de brillo
     LECTURAS_PARA_CONFIRMAR = 2          # 2 frames seguidos (~0.2s): evita falsos por un frame raro
+    ESPERA_APRENDER_SEG = 1.5            # lo que tarda la imagen en estabilizarse (al encender / tras exposicion)
+
+    def _iniciar_aprendizaje(self):
+        """Olvida la linea base y la vuelve a tomar de la escena ya estable.
+        La linea base solo se actualiza mientras la camara NO parece tapada:
+        si arranca mal (el primer cuadro de una webcam suele ser negro) o
+        queda vieja tras un cambio de exposicion, el detector se trababa en
+        "sabotaje" para siempre y una tapada real ya no hacia sonar nada."""
+        self._baseline_brillo = None
+        self._baseline_bordes = None
+        self._lecturas_tapada = 0
+        self._aprender_desde = time.time() + self.ESPERA_APRENDER_SEG
 
     def _actualizar_sabotaje(self, frame):
+        if time.time() < self._aprender_desde:
+            return
         gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         # meanStdDev de OpenCV: mismo resultado que numpy mean/std pero ~10x
         # mas rapido (std de numpy tomaba ~12 ms por cuadro y bajaba los fps)
@@ -333,7 +349,11 @@ class CamaraThread(QThread):
             self._en_sabotaje = True
             self._ultimo_sabotaje = ahora
             self.estado_cambiado.emit("sabotaje")
-            self._exportar_evidencia_sabotaje()
+            # en otro hilo: armar el video (descomprimir 8 s y escribirlo) tardaba
+            # 1.5-4 s y, mientras tanto, esta camara dejaba de leer: la imagen se congelaba
+            threading.Thread(
+                target=self._exportar_evidencia_sabotaje, args=(list(self._buffer),), daemon=True,
+            ).start()
         elif self._lecturas_tapada == 0:
             if self._en_sabotaje:
                 self.estado_cambiado.emit("conectada")
@@ -342,8 +362,8 @@ class CamaraThread(QThread):
             self._baseline_brillo = 0.98 * self._baseline_brillo + 0.02 * brillo
             self._baseline_bordes = 0.98 * self._baseline_bordes + 0.02 * bordes
 
-    def _exportar_evidencia_sabotaje(self):
-        frames = [f for f in (cv2.imdecode(j, cv2.IMREAD_COLOR) for j in list(self._buffer)) if f is not None]
+    def _exportar_evidencia_sabotaje(self, jpgs):
+        frames = [f for f in (cv2.imdecode(j, cv2.IMREAD_COLOR) for j in jpgs) if f is not None]
         if not frames:
             return
         marca_tiempo = time.strftime("%Y%m%d_%H%M%S")
@@ -373,13 +393,11 @@ class CamaraThread(QThread):
         captura.set(cv2.CAP_PROP_GAIN, self._ganancia)
 
     def _poner_exposicion(self, captura, exposicion):
-        subir = exposicion > self._exposicion
         self._exposicion = exposicion
         captura.set(cv2.CAP_PROP_EXPOSURE, exposicion)
-        # un paso de exposicion duplica (o divide) el brillo: la linea base
-        # del sabotaje acompana, para no tomarlo como camara tapada
-        if self._baseline_brillo is not None:
-            self._baseline_brillo = min(255.0, self._baseline_brillo * (2 if subir else 0.5))
+        # el brillo cambia de golpe (y no en una proporcion fija): se vuelve a
+        # aprender la escena en vez de tomarlo como camara tapada
+        self._iniciar_aprendizaje()
 
     def _poner_ganancia(self, captura, ganancia):
         if ganancia < 0 or not captura.set(cv2.CAP_PROP_GAIN, ganancia):
@@ -392,6 +410,8 @@ class CamaraThread(QThread):
         grande se confundiria con una camara tapada. Con poca luz: exposicion
         hasta la fluida, ganancia hasta su tope, y recien ahi la lenta. Con
         mucha luz, al reves."""
+        if self._en_sabotaje or self._lecturas_tapada:
+            return  # parece tapada: compensar la oscuridad taparia el sabotaje
         brillo = float(frame[::8, ::8].mean())
         minimo, maximo = BRILLO_OBJETIVO
         if minimo <= brillo <= maximo:
@@ -426,6 +446,8 @@ class CamaraThread(QThread):
             self._forzar_reconexion = False  # descarta pedidos de reconexion viejos, ya se reconecto
             if self.tipo_conexion == "USB":
                 self._iniciar_exposicion_webcam(captura)
+            if self._baseline_brillo is None:
+                self._iniciar_aprendizaje()  # primera conexion: no tomar de base el cuadro negro inicial
 
             self.estado_cambiado.emit("conectada")
             razon = self._transmitir(captura)

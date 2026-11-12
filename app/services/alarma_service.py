@@ -2,20 +2,18 @@
 
 Antes solo sonaba QApplication.beep(): el "ding" suave de Windows, facil de
 no oir en una garita. Aqui se genera una sirena de dos tonos a volumen
-maximo (WAV, sin dependencias nuevas: numpy ya esta en el proyecto) y se
-reproduce en bucle con winsound hasta que se destape la camara, el
-vigilante la silencie, o pase el tiempo maximo.
+maximo (WAV) y se reproduce en bucle con QSoundEffect (Qt) hasta que se
+destape la camara, el vigilante la silencie, o pase el tiempo maximo.
+
+No con winsound: apagar un sonido en bucle de winsound bloqueaba 5-10 s
+(medido), y como se apaga desde la interfaz, el programa entero se
+congelaba justo al destapar la camara. Se usa siempre desde el hilo de la UI.
 """
 import math
 import os
 import struct
 import tempfile
 import wave
-
-try:
-    import winsound
-except ImportError:  # no-Windows: sin sirena, se cae al beep de Qt
-    winsound = None
 
 FRECUENCIA_MUESTREO = 22050
 _ruta_sirena = None
@@ -56,25 +54,36 @@ def _ruta_wav():
     return ruta
 
 
-def iniciar_sirena():
-    """Empieza la sirena en bucle (no bloquea). Devuelve False si no se pudo
-    (ej. no es Windows): el que llama puede caer a un beep normal."""
-    if winsound is None:
-        return False
+_efecto = None
+
+
+def preparar():
+    """Carga la sirena por adelantado (se carga en segundo plano): asi la
+    primera alarma suena al instante. Requiere la QApplication creada."""
+    global _efecto
+    if _efecto is not None:
+        return
     try:
-        winsound.PlaySound(
-            _ruta_wav(),
-            winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_LOOP | winsound.SND_NODEFAULT,
-        )
-        return True
-    except Exception:
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtMultimedia import QSoundEffect
+    except ImportError:
+        return
+    _efecto = QSoundEffect()
+    _efecto.setSource(QUrl.fromLocalFile(_ruta_wav()))
+    _efecto.setLoopCount(QSoundEffect.Loop.Infinite.value)
+    _efecto.setVolume(1.0)
+
+
+def iniciar_sirena():
+    """Empieza la sirena en bucle (no bloquea). Devuelve False si no se pudo:
+    el que llama puede caer a un beep normal."""
+    preparar()
+    if _efecto is None:
         return False
+    _efecto.play()
+    return True
 
 
 def detener_sirena():
-    if winsound is None:
-        return
-    try:
-        winsound.PlaySound(None, winsound.SND_PURGE)
-    except Exception:
-        pass
+    if _efecto is not None:
+        _efecto.stop()

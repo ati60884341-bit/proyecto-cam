@@ -38,6 +38,7 @@ class MonitoreoController:
         self.camaras_por_zona = {c["Clave"]: c for c in camaras}
         self.hilos_camara = {}
         self.dialogos_ampliados = {}
+        self._estados = {}  # clave -> ultimo estado (para el resumen de Inicio)
         self.factor_zoom = {}
         # lista, no una sola variable: si se mueven dos camaras (zonas
         # distintas) casi al mismo tiempo, una sola variable pierde la
@@ -78,6 +79,7 @@ class MonitoreoController:
         # al tiempo maximo (para no sonar toda la noche si nadie esta)
         self._zonas_en_sabotaje = set()
         self._alarma_sonando = False
+        alarma_service.preparar()
         self._timer_alarma = QTimer()
         self._timer_alarma.setSingleShot(True)
         self._timer_alarma.timeout.connect(lambda: self._silenciar_alarma("paso el tiempo maximo de 60 s"))
@@ -190,6 +192,12 @@ class MonitoreoController:
         if hilo_webcam:
             hilo_webcam.frame_listo.connect(self.detector_panico.alimentar_frame)
         self.detector_panico.start()
+
+    def resumen_camaras(self):
+        """(en linea, total) de las camaras no ocultas."""
+        visibles = [k for k in self.camaras_por_zona if k not in self._zonas_ocultas]
+        en_linea = sum(1 for k in visibles if self._estados.get(k) in ("conectada", "reconectando"))
+        return en_linea, len(visibles)
 
     def _clave_panico(self):
         """El gesto de panico se mira en la webcam de la PC (la que tiene
@@ -434,6 +442,7 @@ class MonitoreoController:
     def _on_estado(self, zona, estado):
         if zona in self._zonas_ocultas:
             return  # aviso rezagado de un hilo ya suspendido
+        self._estados[zona] = estado
         zf = self.view.zona_widget(zona)
         if zf:
             zf.actualizar_estado(estado)

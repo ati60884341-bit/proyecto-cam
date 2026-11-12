@@ -169,7 +169,20 @@ def _flecha_abajo(pintor, r, color):
     ]))
 
 
+def _inicio(pintor, r, color):
+    _pluma(pintor, color)
+    techo = QPolygonF([
+        QPointF(r.left() + 2, r.center().y() - 0.5),
+        QPointF(r.center().x(), r.top() + 3),
+        QPointF(r.right() - 2, r.center().y() - 0.5),
+    ])
+    pintor.drawPolyline(techo)
+    pintor.drawRect(QRectF(r.left() + 4.5, r.center().y() - 1.5, r.width() - 9, r.height() / 2 - 1.5))
+    pintor.drawLine(QPointF(r.center().x(), r.bottom() - 3), QPointF(r.center().x(), r.bottom() - 7))
+
+
 _DIBUJANTES = {
+    "inicio": _inicio,
     "microfono": _microfono,
     "copiar": _copiar,
     "flecha_abajo": _flecha_abajo,
