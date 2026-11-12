@@ -7,21 +7,21 @@ from PyQt6.QtWidgets import QApplication
 
 from app.config import EVIDENCIAS_DIR
 from app.models import incidencia_model, evidencia_model, fatiga_model, comando_model, dispositivo_dvr_model
-from app.services.camera_service import CamaraThread
+from app.services.camera_service import CamaraThread, SEGUNDOS_FOTO_ANTES
 from app.services.grabador_info import IdentificarGrabadoresThread
 from app.services.hash_service import firmar_archivo
 from app.services.fatiga_service import AuditorFatiga
 from app.services.voice_service import GrabacionVozThread, interpretar_comando, hablar
 from app.services.panic_service import DetectorPanicoThread
 from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread
-from app.services import telegram_service, alarma_service
+from app.services import alertas_service, alarma_service
 from app.views.UI.zona_ampliada_dialog import ZonaAmpliadaDialog
 
 import cv2
 
 
-class _PuenteTelegram(QObject):
-    """telegram_service envia desde un hilo Python comun (no QThread); una
+class _PuenteAlertas(QObject):
+    """alertas_service envia desde un hilo Python comun (no QThread); una
     senal Qt es la forma segura de volver al hilo de la UI para actualizar
     la bitacora sin tocar widgets desde otro hilo."""
     resultado = pyqtSignal(bool, str)
@@ -45,9 +45,9 @@ class MonitoreoController:
         # de que Python la recolecte a mitad de la llamada ONVIF)
         self._hilos_ptz_activos = []
 
-        self._puente_telegram = _PuenteTelegram()
-        self._puente_telegram.resultado.connect(
-            lambda ok, msg: self.view.registrar_evento(f"[TELEGRAM] {msg}")
+        self._puente_alertas = _PuenteAlertas()
+        self._puente_alertas.resultado.connect(
+            lambda ok, msg: self.view.registrar_evento(f"[ALERTA AL CELULAR] {msg}")
         )
 
         self.view.capturar_evidencia.connect(self.capturar_evidencia)
@@ -501,10 +501,14 @@ class MonitoreoController:
         # detecta, sin esperar a que se exporte la evidencia)
 
         if os.path.exists(ruta_foto) and hash_foto:
-            telegram_service.enviar_foto_async(
+            alertas_service.enviar_alerta_async(
                 ruta_foto,
-                f"🚨 SABOTAJE detectado en {zona}\nSHA-256: {hash_foto}",
-                al_terminar=self._puente_telegram.resultado.emit,
+                f"🚨 ALERTA: camara tapada o movida\n"
+                f"Camara: {zona}\n"
+                f"Hora: {time.strftime('%d/%m/%Y %H:%M:%S')}\n"
+                f"Foto: {SEGUNDOS_FOTO_ANTES} segundos antes del sabotaje\n"
+                f"Firma SHA-256: {hash_foto}",
+                al_terminar=self._puente_alertas.resultado.emit,
             )
 
     # ---------------- captura manual de evidencia ----------------
@@ -691,12 +695,13 @@ class MonitoreoController:
                     camara["IdZona"], ruta, "Foto", hash_archivo,
                     id_usuario=self.usuario["IdUsuario"], id_incidencia=id_incidencia,
                 )
-                # la alerta a Telegram es precisamente el "aviso externo silencioso"
+                # la alerta al celular es precisamente el "aviso externo silencioso"
                 # de la propuesta: no suena nada en el local, pero llega al celular
-                telegram_service.enviar_foto_async(
+                alertas_service.enviar_alerta_async(
                     ruta,
-                    f"🆘 MODO PANICO SILENCIOSO activado en {camara['Nombre']}\nSHA-256: {hash_archivo}",
-                    al_terminar=self._puente_telegram.resultado.emit,
+                    f"🆘 MODO PANICO SILENCIOSO\nCamara: {camara['Nombre']}\n"
+                    f"Hora: {time.strftime('%d/%m/%Y %H:%M:%S')}\nFirma SHA-256: {hash_archivo}",
+                    al_terminar=self._puente_alertas.resultado.emit,
                 )
 
         # sin alarma sonora: es un modo silencioso para no poner en riesgo al trabajador

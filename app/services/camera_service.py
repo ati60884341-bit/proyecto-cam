@@ -26,7 +26,8 @@ RESINCRONIZACION_PERIODICA_SEG = 600    # reconexion preventiva: limita cuanto s
                                          # y el atraso ahora lo vigila ATRASO_MAXIMO_SEG
 ATRASO_MAXIMO_SEG = 1.5                 # si el video va mas de esto detras del tiempo real, se resincroniza
 CALIDAD_JPEG_BUFFER = 85                # "maquina del tiempo" comprimida (ver CamaraThread._buffer)
-FPS_WEBCAM = 30                         # la webcam local da 30 fps de verdad; los DVR/NVR, CAPTURA_FPS
+SEGUNDOS_FOTO_ANTES = 3                 # la foto de evidencia es de estos segundos antes del sabotaje
+FPS_WEBCAM = 30                        # la webcam local da 30 fps de verdad; los DVR/NVR, CAPTURA_FPS
 # exposicion de la webcam (escala de DirectShow: 2^n segundos). Con la
 # automatica del driver, en poca luz la webcam alarga la exposicion y cae a
 # ~5-8 fps (medido). Se controla a mano: -4 da ~24 fps y -3 ~13 fps. La
@@ -348,8 +349,8 @@ class CamaraThread(QThread):
         marca_tiempo = time.strftime("%Y%m%d_%H%M%S")
         base = f"sabotaje_{self.zona}_{marca_tiempo}".replace(" ", "_")
 
-        # foto ~2 segundos antes del bloqueo (el rostro del culpable acercandose)
-        indice_foto = max(0, len(frames) - 2 * self._fps)
+        # foto unos segundos antes del bloqueo (el rostro del culpable acercandose)
+        indice_foto = max(0, len(frames) - SEGUNDOS_FOTO_ANTES * self._fps)
         ruta_foto = os.path.join(EVIDENCIAS_DIR, base + ".jpg")
         cv2.imwrite(ruta_foto, frames[indice_foto])
 

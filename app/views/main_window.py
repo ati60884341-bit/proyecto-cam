@@ -12,7 +12,7 @@ from app.views.reportes_view import ReportesView
 from app.views.camaras_view import CamarasView
 from app.views.dvr_view import DvrView
 from app.views.radar_view import RadarView
-from app.views.telegram_view import TelegramView
+from app.views.alertas_view import AlertasView
 from app.views.manuales_view import ManualesView
 from app.views.UI.pantalla import tamano_adaptado
 from app.views.UI.fondo_nocturno import FondoNocturno
@@ -91,7 +91,7 @@ class MainWindow(QMainWindow):
             ("radar", "Radar de camaras"),
             ("camaras", "Camaras"),
             ("dvr", "NVR / DVR"),
-            ("telegram", "Alertas Telegram"),
+            ("telegram", "Alertas al celular"),
             ("reportes", "Reportes"),
             ("manuales", "Manuales"),
         ]:
@@ -120,7 +120,8 @@ class MainWindow(QMainWindow):
         self.radar_view = RadarView()
         self.camaras_view = CamarasView()
         self.dvr_view = DvrView()
-        self.telegram_view = TelegramView()
+        self.alertas_view = AlertasView()
+        self.telegram_view = self.alertas_view.telegram_view
         self.reportes_view = ReportesView()
         self.manuales_view = ManualesView()
 
@@ -132,7 +133,7 @@ class MainWindow(QMainWindow):
             ("radar", self.radar_view),
             ("camaras", self.camaras_view),
             ("dvr", self.dvr_view),
-            ("telegram", self.telegram_view),
+            ("telegram", self.alertas_view),
             ("reportes", self.reportes_view),
             ("manuales", self.manuales_view),
         ]:
@@ -159,7 +160,7 @@ class MainWindow(QMainWindow):
             "radar": self.radar_view,
             "camaras": self.camaras_view,
             "dvr": self.dvr_view,
-            "telegram": self.telegram_view,
+            "telegram": self.alertas_view,
             "reportes": self.reportes_view,
             "manuales": self.manuales_view,
         }

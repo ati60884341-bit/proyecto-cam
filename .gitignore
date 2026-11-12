@@ -4,6 +4,7 @@ __pycache__/
 *.log
 evidencias/
 telegram_config.json
+whatsapp_config.json
 build/
 dist/
 build_log.txt

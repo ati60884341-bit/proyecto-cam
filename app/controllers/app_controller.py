@@ -9,6 +9,7 @@ from app.controllers.camara_controller import CamaraController
 from app.controllers.dvr_controller import DvrController
 from app.controllers.radar_controller import RadarController
 from app.controllers.telegram_controller import TelegramController
+from app.controllers.alertas_controller import AlertasController
 
 
 class AppController:
@@ -47,6 +48,7 @@ class AppController:
             mostrar_seccion=self.main_window.mostrar_seccion,
         )
         self.telegram_controller = TelegramController(self.main_window.telegram_view)
+        self.alertas_controller = AlertasController(self.main_window.alertas_view)
 
     def show(self):
         self.main_window.show()
