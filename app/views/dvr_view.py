@@ -3,15 +3,20 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit,
     QComboBox, QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QTextEdit, QScrollArea,
+    QTextEdit, QScrollArea, QButtonGroup,
 )
 
 from app.services import network_info
 from app.views.UI.panel_mi_red import PanelMiRed
 from app.views.UI.checklist_red_dialog import ChecklistRedDialog
+from app.views.UI.desplegable import Desplegable
 
 MARCAS_DVR = ["Hikvision", "Dahua"]
-COLUMNAS = ["ID", "Nombre", "Marca", "IP", "En esta red", "Canales", "Camaras activas"]
+COLUMNAS = ["ID", "Tipo", "Nombre", "Marca", "IP", "En esta red", "Canales", "Camaras activas"]
+ESTILO_TIPO = (
+    "QPushButton { padding: 10px 18px; font-weight: bold; }"
+    "QPushButton:checked { background: #1f8f86; border-color: #36d6c9; color: white; }"
+)
 
 
 class DvrView(QWidget):
@@ -52,24 +57,15 @@ class DvrView(QWidget):
         layout_externo.addWidget(scroll)
         layout = QVBoxLayout(contenido)
 
-        intro = QLabel(
-            "Un DVR (para camaras analogicas) o NVR (para camaras IP) es un grabador con varios\n"
-            "canales, cada uno con su propia camara conectada. En vez de agregar canal por canal,\n"
-            "registre aqui el grabador UNA sola vez (IP, usuario, clave y cuantos canales tiene) y\n"
-            "el sistema prueba cada canal y agrega sola una camara por cada uno que responda —\n"
-            "asi se ve en el Centro de Monitoreo TODO lo que esta conectado al grabador."
-        )
+        intro = QLabel("Registre el grabador una vez: el programa busca solo todas sus camaras.")
+        intro.setStyleSheet("color: #9aa6b3;")
         layout.addWidget(intro)
 
-        layout.addWidget(PanelMiRed())
-
-        # ---------------- perfiles de sitio ----------------
-        grupo_perfiles = QGroupBox("Perfil de sitio (opcional)")
+        # ---------------- perfiles de sitio (dentro de "Herramientas") ----------------
+        grupo_perfiles = QWidget()
         v_perfiles = QVBoxLayout(grupo_perfiles)
-        v_perfiles.addWidget(QLabel(
-            "Si ya se instalo antes en este taller/cliente, elige su perfil para precargar sus\n"
-            "datos tipicos (no guarda la clave: esa se escribe a mano cada vez)."
-        ))
+        v_perfiles.setContentsMargins(0, 0, 0, 0)
+        v_perfiles.addWidget(QLabel("Perfil de sitio: precarga los datos de un lugar donde ya se instalo (sin la clave)."))
         fila_elegir = QHBoxLayout()
         self.combo_perfiles = QComboBox()
         self.combo_perfiles.addItem("— Elegir perfil guardado —", None)
@@ -86,18 +82,38 @@ class DvrView(QWidget):
         self.campo_red_router = QLineEdit()
         self.campo_red_router.setPlaceholderText("Nombre de la red del router portatil (opcional)")
         fila_guardar.addWidget(self.campo_red_router, stretch=1)
-        btn_guardar_perfil = QPushButton("Guardar datos de abajo como perfil nuevo")
+        btn_guardar_perfil = QPushButton("Guardar datos del formulario como perfil")
         btn_guardar_perfil.clicked.connect(self._emitir_guardar_perfil)
         fila_guardar.addWidget(btn_guardar_perfil)
         v_perfiles.addLayout(fila_guardar)
 
-        layout.addWidget(grupo_perfiles)
+        herramientas = QWidget()
+        v_herramientas = QVBoxLayout(herramientas)
+        v_herramientas.setContentsMargins(0, 0, 0, 0)
+        v_herramientas.addWidget(PanelMiRed())
+        v_herramientas.addWidget(grupo_perfiles)
 
-        grupo = QGroupBox("Registrar un DVR/NVR nuevo")
+        grupo = QGroupBox("Agregar un grabador")
         formulario = QFormLayout(grupo)
 
+        # DVR / NVR: dos botones grandes en vez de una lista
+        fila_tipo = QHBoxLayout()
+        self.grupo_tipo = QButtonGroup(self)
+        for indice, (tipo, ayuda) in enumerate((
+            ("DVR", "Camaras analogicas (cable coaxial)"),
+            ("NVR", "Camaras IP (cable de red / WiFi)"),
+        )):
+            boton = QPushButton(f"{tipo}\n{ayuda}")
+            boton.setCheckable(True)
+            boton.setStyleSheet(ESTILO_TIPO)
+            boton.setProperty("tipo", tipo)
+            self.grupo_tipo.addButton(boton, indice)
+            fila_tipo.addWidget(boton)
+        self.grupo_tipo.button(0).setChecked(True)
+        formulario.addRow("Tipo:", fila_tipo)
+
         self.campo_nombre = QLineEdit()
-        self.campo_nombre.setPlaceholderText("Ej: DVR Patio Central  (tambien se usa para nombrar sus zonas/camaras)")
+        self.campo_nombre.setPlaceholderText("Ej: Patio Central")
         formulario.addRow("Nombre:", self.campo_nombre)
 
         self.campo_marca = QComboBox()
@@ -106,32 +122,32 @@ class DvrView(QWidget):
 
         self.campo_ip = QLineEdit()
         self.campo_ip.setPlaceholderText("Ej: 192.168.1.64")
-        formulario.addRow("IP del grabador:", self.campo_ip)
-
-        self.campo_puerto = QLineEdit("554")
-        formulario.addRow("Puerto RTSP:", self.campo_puerto)
+        formulario.addRow("IP:", self.campo_ip)
 
         self.campo_usuario = QLineEdit("admin")
         formulario.addRow("Usuario:", self.campo_usuario)
 
         self.campo_clave = QLineEdit()
         self.campo_clave.setEchoMode(QLineEdit.EchoMode.Password)
+        self.campo_clave.setPlaceholderText("La misma con que entra al menu del grabador")
         formulario.addRow("Clave:", self.campo_clave)
 
-        self.campo_canales = QLineEdit("4")
-        self.campo_canales.setPlaceholderText("Cuantos canales/camaras tiene el grabador")
-        formulario.addRow("Cantidad de canales:", self.campo_canales)
+        self.campo_canales = QComboBox()
+        self.campo_canales.setEditable(True)
+        self.campo_canales.addItems(["4", "8", "16", "32"])
+        formulario.addRow("Canales:", self.campo_canales)
 
-        self.chk_ptz = QCheckBox("Todos los canales son domos PTZ (pueden moverse)")
-        self.chk_ptz.setToolTip(
-            "Marquelo solo si TODOS los canales de este grabador son camaras con motor\n"
-            "PTZ. La mayoria de instalaciones usan camaras fijas: si mezcla domos PTZ con\n"
-            "camaras fijas en el mismo grabador, agregue las PTZ por separado desde la\n"
-            "pestana \"Camaras\" para marcarlas una por una."
-        )
-        formulario.addRow(self.chk_ptz)
+        avanzado = QWidget()
+        form_avanzado = QFormLayout(avanzado)
+        form_avanzado.setContentsMargins(0, 0, 0, 0)
+        self.campo_puerto = QLineEdit("554")
+        form_avanzado.addRow("Puerto RTSP:", self.campo_puerto)
+        self.chk_ptz = QCheckBox("Todas sus camaras tienen motor PTZ (se pueden mover)")
+        form_avanzado.addRow(self.chk_ptz)
+        formulario.addRow(Desplegable("Opciones avanzadas", avanzado))
 
-        self.btn_registrar = QPushButton("Registrar y detectar todos los canales")
+        self.btn_registrar = QPushButton("Agregar y buscar sus camaras")
+        self.btn_registrar.setStyleSheet("QPushButton { background: #1f8f86; font-weight: bold; }")
         self.btn_registrar.clicked.connect(self._emitir_registrar)
         formulario.addRow(self.btn_registrar)
 
@@ -139,6 +155,7 @@ class DvrView(QWidget):
         formulario.addRow(self.lbl_progreso)
 
         layout.addWidget(grupo)
+        layout.addWidget(Desplegable("Herramientas de instalacion (red de esta PC, perfiles de sitio)", herramientas))
 
         encabezado = QHBoxLayout()
         encabezado.addWidget(QLabel("Grabadores (DVR/NVR) registrados"))
@@ -174,12 +191,10 @@ class DvrView(QWidget):
         layout.addWidget(self.tabla)
 
         # ---------------- bitacora de instalacion (compartida) ----------------
-        grupo_bitacora = QGroupBox("Bitacora de instalacion (compartida con el equipo)")
+        grupo_bitacora = QWidget()
         v_bitacora = QVBoxLayout(grupo_bitacora)
-        v_bitacora.addWidget(QLabel(
-            "Selecciona un grabador arriba para ver o agregar notas — las ve todo el equipo,\n"
-            "no solo quien la escribio (ej. \"este DVR necesita el puerto 8000, no el 554\")."
-        ))
+        v_bitacora.setContentsMargins(0, 0, 0, 0)
+        v_bitacora.addWidget(QLabel("Notas del grabador seleccionado arriba; las ve todo el equipo."))
         self.texto_bitacora = QTextEdit()
         self.texto_bitacora.setReadOnly(True)
         self.texto_bitacora.setMaximumHeight(90)
@@ -195,9 +210,9 @@ class DvrView(QWidget):
         fila_nota.addWidget(self.btn_agregar_nota)
         v_bitacora.addLayout(fila_nota)
 
-        layout.addWidget(grupo_bitacora)
+        layout.addWidget(Desplegable("Bitacora de instalacion (notas del equipo)", grupo_bitacora))
 
-        layout.addWidget(QLabel("Registro de deteccion de canales:"))
+        layout.addWidget(QLabel("Resultado de la busqueda de camaras:"))
         self.texto_log = QTextEdit()
         self.texto_log.setReadOnly(True)
         self.texto_log.setMaximumHeight(140)
@@ -226,7 +241,9 @@ class DvrView(QWidget):
         self.campo_ip.setText(info.get("ip", ""))
         canales = info.get("canales_detectados", 1)
         if canales > 1:
-            self.campo_canales.setText(str(canales))
+            self.campo_canales.setCurrentText(str(canales))
+        if "NVR" in (info.get("modelo") or "").upper():
+            self.grupo_tipo.button(1).setChecked(True)
         if not self.campo_nombre.text().strip():
             modelo = info.get("modelo", "")
             self.campo_nombre.setText(f"{marca} {modelo}".strip() or f"Grabador {info.get('ip', '')}")
@@ -290,7 +307,7 @@ class DvrView(QWidget):
             QMessageBox.warning(self, "Faltan datos", "Complete el nombre y la IP del grabador.")
             return
         try:
-            cantidad_canales = int(self.campo_canales.text().strip() or "4")
+            cantidad_canales = int(self.campo_canales.currentText().strip() or "4")
         except ValueError:
             QMessageBox.warning(self, "Dato invalido", "La cantidad de canales debe ser un numero.")
             return
@@ -309,6 +326,7 @@ class DvrView(QWidget):
             self.campo_clave.setFocus()
             return
         self.registrar_solicitado.emit({
+            "tipo": self.grupo_tipo.checkedButton().property("tipo"),
             "nombre": nombre,
             "marca": self.campo_marca.currentText(),
             "ip": ip,
@@ -354,7 +372,7 @@ class DvrView(QWidget):
             return
         fila = filas[0].row()
         id_dispositivo = int(self.tabla.item(fila, 0).text())
-        nombre = self.tabla.item(fila, 1).text()
+        nombre = self.tabla.item(fila, 2).text()
         confirmacion = QMessageBox.question(
             self, "Confirmar",
             f"¿Quitar el grabador \"{nombre}\" y TODAS sus camaras (se detienen sus hilos y "
@@ -384,12 +402,12 @@ class DvrView(QWidget):
             en_red = network_info.ip_en_red_local(d["IP"], interfaces)
             en_red_texto = {True: "Si", False: "No — otra subred"}.get(en_red, "?")
             valores = [
-                d["IdDispositivo"], d["Nombre"], d["Marca"], d["IP"], en_red_texto,
+                d["IdDispositivo"], d["Tipo"], d["Nombre"], d["Marca"], d["IP"], en_red_texto,
                 d["CantidadCanales"], d["CamarasActivas"],
             ]
             for columna, valor in enumerate(valores):
                 item = QTableWidgetItem(str(valor))
-                if columna == 4 and en_red is False:
+                if columna == 5 and en_red is False:
                     item.setForeground(QColor("#e35b5b"))
                 self.tabla.setItem(fila, columna, item)
 

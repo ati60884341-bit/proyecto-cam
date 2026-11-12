@@ -6,12 +6,12 @@ from PyQt6.QtCore import QTimer, QObject, QSettings, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 
 from app.config import EVIDENCIAS_DIR
-from app.models import zona_model, incidencia_model, evidencia_model, fatiga_model, comando_model, dispositivo_dvr_model
+from app.models import incidencia_model, evidencia_model, fatiga_model, comando_model, dispositivo_dvr_model
 from app.services.camera_service import CamaraThread
 from app.services.grabador_info import IdentificarGrabadoresThread
 from app.services.hash_service import firmar_archivo
 from app.services.fatiga_service import AuditorFatiga
-from app.services.voice_service import AsistenteVozThread, interpretar_comando, hablar, registrar_zona, normalizar
+from app.services.voice_service import GrabacionVozThread, interpretar_comando, hablar
 from app.services.panic_service import DetectorPanicoThread
 from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread
 from app.services import telegram_service, alarma_service
@@ -33,8 +33,9 @@ class MonitoreoController:
         self.usuario = usuario
         self.obtener_turno_actual = obtener_turno_actual
 
-        self.zonas_por_nombre = {z["Nombre"]: z for z in zona_model.listar()}
-        self.camaras_por_zona = {c["Zona"]: c for c in camaras}
+        # un recuadro/hilo por CAMARA, con su "Clave" (su nombre) como llave;
+        # los nombres heredados "zona"/"por_zona" de aqui abajo se refieren a esa clave
+        self.camaras_por_zona = {c["Clave"]: c for c in camaras}
         self.hilos_camara = {}
         self.dialogos_ampliados = {}
         self.factor_zoom = {}
@@ -53,7 +54,8 @@ class MonitoreoController:
         self.view.ampliar_zona.connect(self.ampliar_zona)
         self.view.reconectar_zona.connect(self.reconectar_camara)
         self.view.comando_manual_enviado.connect(self._procesar_comando_manual)
-        self.view.asistente_voz_alternado.connect(self._alternar_voz)
+        self.view.hablar_presionado.connect(self._empezar_a_hablar)
+        self.view.hablar_soltado.connect(self._terminar_de_hablar)
         self.view.deteccion_gesto_alternada.connect(self._alternar_deteccion_gesto)
         self.view.panico_manual.connect(self.activar_panico)
         self.view.fatiga_confirmada.connect(self._confirmar_fatiga)
@@ -67,7 +69,7 @@ class MonitoreoController:
         # nada a los demas, y no hace falta tocar el esquema de la BD
         self._ajustes = QSettings("ProyectoCAM", "CentroMonitoreo")
         self._ids_ocultos = self._leer_ids_ocultos()
-        self._zonas_ocultas = {c["Zona"] for c in camaras if c["IdCamara"] in self._ids_ocultos}
+        self._zonas_ocultas = {c["Clave"] for c in camaras if c["IdCamara"] in self._ids_ocultos}
         for zona in self._zonas_ocultas:
             self.view.set_zona_oculta(zona, True)
 
@@ -81,6 +83,7 @@ class MonitoreoController:
         self._timer_alarma.timeout.connect(lambda: self._silenciar_alarma("paso el tiempo maximo de 60 s"))
 
         self.hilo_voz = None
+        self._hilos_voz_terminando = []
         self.detector_panico = None
         self._gesto_activando = False
 
@@ -96,7 +99,7 @@ class MonitoreoController:
         # con el arranque de las camaras ni gasta CPU/RAM de mas por defecto.
         self._proximo_arranque_disponible = 0.0
         for camara in camaras:
-            if camara["Zona"] in self._zonas_ocultas:
+            if camara["Clave"] in self._zonas_ocultas:
                 continue  # suspendida: ni se conecta (no ocupa conexion del DVR ni CPU)
             self._programar_arranque_nativo(lambda c=camara: self._iniciar_hilo_camara(c))
         self._identificar_grabadores()
@@ -159,9 +162,10 @@ class MonitoreoController:
             self._gesto_activando = False  # cancela el arranque si aun no se habia disparado
             if self.detector_panico is None:
                 return
-            if "Ingreso" in self.hilos_camara:
+            hilo_webcam = self.hilos_camara.get(self._clave_panico())
+            if hilo_webcam:
                 try:
-                    self.hilos_camara["Ingreso"].frame_listo.disconnect(self.detector_panico.alimentar_frame)
+                    hilo_webcam.frame_listo.disconnect(self.detector_panico.alimentar_frame)
                 except TypeError:
                     pass
             self.detector_panico.detener()
@@ -179,16 +183,27 @@ class MonitoreoController:
             lambda msg: self.view.lbl_estado_gesto.setText(f"Deteccion de gesto: {msg}")
         )
         self.detector_panico.started.connect(
-            lambda: self.view.lbl_estado_gesto.setText("Deteccion de gesto: activa en camara de Ingreso")
+            lambda: self.view.lbl_estado_gesto.setText("Deteccion de gesto: activa en la webcam")
         )
         self.detector_panico.progreso.connect(self._actualizar_progreso_gesto)
-        if "Ingreso" in self.hilos_camara:
-            self.hilos_camara["Ingreso"].frame_listo.connect(self.detector_panico.alimentar_frame)
+        hilo_webcam = self.hilos_camara.get(self._clave_panico())
+        if hilo_webcam:
+            hilo_webcam.frame_listo.connect(self.detector_panico.alimentar_frame)
         self.detector_panico.start()
+
+    def _clave_panico(self):
+        """El gesto de panico se mira en la webcam de la PC (la que tiene
+        delante el vigilante): la primera camara USB registrada."""
+        return next((k for k, c in self.camaras_por_zona.items() if c["TipoConexion"] == "USB"), None)
+
+    def _camara_panico(self):
+        """Camara a la que se asignan las incidencias de panico/fatiga: la
+        webcam, o cualquiera si no hay webcam."""
+        return self.camaras_por_zona.get(self._clave_panico()) or next(iter(self.camaras_por_zona.values()), None)
 
     # ---------------- alta de camaras (cualquier marca) ----------------
     def _iniciar_hilo_camara(self, camara):
-        zona = camara["Zona"]
+        zona = camara["Clave"]
         # el arranque se programa con retraso (cola nativa): para cuando le
         # toca, la camara pudo haberse ocultado, quitado o reemplazado
         actual = self.camaras_por_zona.get(zona)
@@ -215,7 +230,7 @@ class MonitoreoController:
         hilo.sabotaje_detectado.connect(self._on_sabotaje)
         self.hilos_camara[zona] = hilo
         hilo.start()
-        if zona == "Ingreso" and getattr(self, "detector_panico", None):
+        if zona == self._clave_panico() and getattr(self, "detector_panico", None):
             hilo.frame_listo.connect(self.detector_panico.alimentar_frame)
         return hilo
 
@@ -238,10 +253,11 @@ class MonitoreoController:
         hilo.finished.connect(lambda h=hilo: h in retirados and retirados.remove(h))
 
     def agregar_camara(self, camara):
-        """Agrega (o reemplaza) la camara de una zona en caliente, sin
-        reiniciar la app. Cualquier marca: RTSP sirve para IP de cualquier
-        fabricante, USB para webcams locales."""
-        zona = camara["Zona"]
+        """Agrega una camara en caliente (su propio recuadro, al lado de las
+        demas de su grupo), sin reiniciar la app. Cualquier marca: RTSP sirve
+        para IP de cualquier fabricante, USB para webcams locales."""
+        camara.setdefault("Clave", camara["Nombre"])
+        zona = camara["Clave"]
 
         self.camaras_por_zona[zona] = camara
         # una camara recien agregada siempre se muestra
@@ -249,25 +265,22 @@ class MonitoreoController:
         if camara["IdCamara"] in self._ids_ocultos:
             self._ids_ocultos.discard(camara["IdCamara"])
             self._guardar_ids_ocultos()
-        if zona not in self.zonas_por_nombre:
-            zona_info = zona_model.obtener_por_nombre(zona)
-            if zona_info:
-                self.zonas_por_nombre[zona] = zona_info
 
         self.view.agregar_zona_frame(camara)
         self._programar_arranque_nativo(lambda c=camara: self._iniciar_hilo_camara(c))
-        registrar_zona(zona)
         self._actualizar_manual_ptz()
         self.view.registrar_evento(
-            f"[CAMARA] Nueva camara en {zona}: {camara['Nombre']} ({camara['Marca']}, {camara['TipoConexion']})."
+            f"[CAMARA] Nueva camara: {camara['Nombre']} ({camara['Marca']}, {camara['TipoConexion']})."
         )
         if camara.get("IdDispositivo"):
             self._identificar_grabadores([camara["IdDispositivo"]])
 
-    def quitar_camara(self, zona):
-        """Detiene la camara y borra la zona por completo del Centro de
-        Monitoreo: no debe quedar rastro (ni el recuadro, ni la vista
-        ampliada si estaba abierta) hasta que se agregue una camara nueva."""
+    def quitar_camara(self, id_camara):
+        """Detiene la camara y borra su recuadro por completo del Centro de
+        Monitoreo (ni el recuadro, ni la vista ampliada si estaba abierta)."""
+        zona = next((k for k, c in self.camaras_por_zona.items() if c["IdCamara"] == id_camara), None)
+        if zona is None:
+            return
         hilo = self.hilos_camara.pop(zona, None)
         if hilo:
             self._retirar_hilo(hilo)
@@ -286,7 +299,7 @@ class MonitoreoController:
 
         self.view.quitar_zona_frame(zona)
         self._actualizar_manual_ptz()
-        self.view.registrar_evento(f"[CAMARA] Camara de {zona} quitada por el administrador.")
+        self.view.registrar_evento(f"[CAMARA] Camara {zona} quitada por el administrador.")
 
     # ---------------- ocultar / mostrar (suspender) camaras ----------------
     def _leer_ids_ocultos(self):
@@ -458,15 +471,14 @@ class MonitoreoController:
 
     # ---------------- sabotaje automatico ----------------
     def _on_sabotaje(self, zona, ruta_video, ruta_foto):
-        zona_info = self.zonas_por_nombre.get(zona)
         camara_info = self.camaras_por_zona.get(zona)
-        if not zona_info:
+        if not camara_info:
             return
 
         id_incidencia = incidencia_model.crear(
-            zona_info["IdZona"], "Sabotaje",
+            camara_info["IdZona"], "Sabotaje",
             "Camara tapada/movida - deteccion automatica (buffer de 8s exportado)",
-            id_camara=camara_info["IdCamara"] if camara_info else None,
+            id_camara=camara_info["IdCamara"],
             id_turno=self.obtener_turno_actual(),
             severidad="Alta",
         )
@@ -478,7 +490,7 @@ class MonitoreoController:
                 if tipo == "Foto":
                     hash_foto = hash_archivo
                 evidencia_model.crear(
-                    zona_info["IdZona"], ruta, tipo, hash_archivo,
+                    camara_info["IdZona"], ruta, tipo, hash_archivo,
                     id_usuario=self.usuario["IdUsuario"], id_incidencia=id_incidencia,
                 )
 
@@ -498,8 +510,8 @@ class MonitoreoController:
     # ---------------- captura manual de evidencia ----------------
     def capturar_evidencia(self, zona):
         hilo = self.hilos_camara.get(zona)
-        zona_info = self.zonas_por_nombre.get(zona)
-        if not hilo or not zona_info:
+        camara = self.camaras_por_zona.get(zona)
+        if not hilo or not camara:
             return
         frame = hilo.capturar_snapshot()
         if frame is None:
@@ -511,7 +523,7 @@ class MonitoreoController:
         cv2.imwrite(ruta, frame)
         hash_archivo = firmar_archivo(ruta)
         evidencia_model.crear(
-            zona_info["IdZona"], ruta, "Foto", hash_archivo, id_usuario=self.usuario["IdUsuario"],
+            camara["IdZona"], ruta, "Foto", hash_archivo, id_usuario=self.usuario["IdUsuario"],
         )
         self.view.registrar_evento(f"[EVIDENCIA] Captura manual en {zona} firmada SHA-256: {hash_archivo[:16]}...")
 
@@ -529,54 +541,48 @@ class MonitoreoController:
 
     # ---------------- comandos (voz / manual) ----------------
     def _procesar_comando_manual(self, texto):
-        accion, zona, _, numero_preset = interpretar_comando(texto)
+        accion, zona, _, numero_preset = interpretar_comando(texto, self.view.camaras_para_voz())
         resultado = self._ejecutar_comando(accion, zona, numero_preset)
         comando_model.registrar(self.usuario["IdUsuario"], texto, resultado)
         self.view.registrar_evento(f"[COMANDO] \"{texto}\" -> {resultado}")
 
-    def _alternar_voz(self, activar):
-        if activar:
-            if self.hilo_voz and self.hilo_voz.isRunning():
-                return
-            self.hilo_voz = AsistenteVozThread(device_index=self.view.microfono_seleccionado())
-            self.hilo_voz.comando_reconocido.connect(self._on_comando_voz_reconocido)
-            self.hilo_voz.error_reconocimiento.connect(
-                lambda msg: self.view.lbl_estado_voz.setText(f"Asistente: {msg}")
-            )
-            self.hilo_voz.escuchando.connect(
-                lambda s: self.view.lbl_estado_voz.setText("Asistente escuchando..." if s else "Asistente activo")
-            )
-            self.hilo_voz.start()
-        else:
-            if self.hilo_voz:
-                # no se bloquea la UI esperando: puede tardar unos segundos en
-                # terminar el listen() en curso; se limpia sola al finalizar
-                self.hilo_voz.detener()
-                self.hilo_voz.finished.connect(self.hilo_voz.deleteLater)
-                self.hilo_voz = None
-            self.view.lbl_estado_voz.setText("Asistente apagado")
+    # ---------------- voz: mantener apretado para hablar ----------------
+    def _empezar_a_hablar(self):
+        if self.hilo_voz:
+            return
+        hilo = GrabacionVozThread(device_index=self.view.microfono_seleccionado())
+        hilo.texto_reconocido.connect(self._on_texto_voz)
+        hilo.texto_parcial.connect(lambda t: self.view.lbl_voz_parcial.setText(f"Detectando: \"{t}\""))
+        hilo.error_reconocimiento.connect(self.view.lbl_estado_voz.setText)
+        self.view.lbl_voz_parcial.setText("")
+        # se guarda hasta que termine (reconocer tarda ~1 s tras soltar):
+        # soltar la ultima referencia a un QThread vivo cierra la app
+        self._hilos_voz_terminando.append(hilo)
+        hilo.finished.connect(lambda h=hilo: self._hilos_voz_terminando.remove(h))
+        hilo.finished.connect(hilo.deleteLater)
+        self.hilo_voz = hilo
+        hilo.start()
+        self.view.lbl_estado_voz.setText("Escuchando... suelte al terminar")
 
-    def _on_comando_voz_reconocido(self, accion, zona, texto, numero_preset):
+    def _terminar_de_hablar(self):
+        hilo, self.hilo_voz = self.hilo_voz, None
+        if not hilo:
+            return
+        hilo.soltar()
+        if hilo.isRunning():
+            self.view.lbl_estado_voz.setText("Reconociendo...")
+
+    def _on_texto_voz(self, texto):
+        accion, zona, _, numero_preset = interpretar_comando(texto, self.view.camaras_para_voz())
         resultado = self._ejecutar_comando(accion, zona, numero_preset)
         comando_model.registrar(self.usuario["IdUsuario"], texto, resultado)
+        self.view.lbl_voz_parcial.setText(f"Escuche: \"{texto}\"")
+        self.view.lbl_estado_voz.setText(resultado)
         self.view.registrar_evento(f"[VOZ] \"{texto}\" -> {resultado}")
         threading.Thread(target=hablar, args=(resultado,), daemon=True).start()
 
-    def _resolver_zona(self, zona_dicha):
-        """zona_dicha ya viene normalizada (minusculas, sin tildes) desde
-        voice_service.interpretar_comando(). Las zonas reales (claves de
-        self.camaras_por_zona/self.hilos_camara) guardan su capitalizacion
-        original tal cual quedo en la base de datos - "Ingreso", pero
-        tambien "DVR Patio Central Canal 1" para los canales de un
-        grabador. Un simple .capitalize() solo funciona con zonas de una
-        palabra; esto compara normalizado contra el nombre real y punto."""
-        if not zona_dicha:
-            return None
-        objetivo = normalizar(zona_dicha)
-        return next((z for z in self.camaras_por_zona if normalizar(z) == objetivo), None)
-
     def _ejecutar_comando(self, accion, zona, numero_preset=None):
-        zona_nombre = self._resolver_zona(zona)
+        zona_nombre = zona if zona in self.camaras_por_zona else None
         if accion == "ampliar" and zona_nombre in self.hilos_camara:
             self.ampliar_zona(zona_nombre)
             return f"Ampliando {zona_nombre}"
@@ -584,10 +590,10 @@ class MonitoreoController:
             if zona_nombre in self.hilos_camara:
                 self.capturar_evidencia(zona_nombre)
                 return f"Evidencia capturada en {zona_nombre}"
-            return "Indique una zona valida para capturar evidencia"
+            return "Indique la camara, por ejemplo: camara 1 capturar"
         if accion in ("zoom_in", "zoom_out", "zoom_reset"):
             if zona_nombre not in self.hilos_camara:
-                return "Indique una zona valida para hacer zoom"
+                return "Indique la camara, por ejemplo: camara 1 zoom"
             return self._ajustar_zoom(zona_nombre, accion)
         if accion.startswith("mover_"):
             direccion = accion.split("_", 1)[1]
@@ -597,7 +603,9 @@ class MonitoreoController:
                 return "Indique el numero de preset (ej. \"patio preset 1\")"
             return self._usar_preset_camara(zona_nombre, numero_preset, accion.split("_", 1)[1])
         if accion == "vista_general":
-            return "Mostrando vista general de las zonas"
+            return "Mostrando vista general de las camaras"
+        if accion == "ampliar":
+            return "Indique la camara, por ejemplo: camara 1 ampliar"
         return "Comando no reconocido"
 
     def _mover_camara(self, zona, direccion):
@@ -661,17 +669,17 @@ class MonitoreoController:
 
     # ---------------- panico silencioso ----------------
     def activar_panico(self):
-        zona_info = self.zonas_por_nombre.get("Ingreso")
-        if not zona_info:
+        camara = self._camara_panico()
+        if not camara:
             return
         id_incidencia = incidencia_model.crear(
-            zona_info["IdZona"], "Panico",
+            camara["IdZona"], "Panico",
             "Modo panico silencioso activado (gesto de manos arriba o boton manual)",
             id_turno=self.obtener_turno_actual(),
             severidad="Critica",
         )
 
-        hilo = self.hilos_camara.get("Ingreso")
+        hilo = self.hilos_camara.get(camara["Clave"])
         if hilo:
             frame = hilo.capturar_snapshot()
             if frame is not None:
@@ -680,14 +688,14 @@ class MonitoreoController:
                 cv2.imwrite(ruta, frame)
                 hash_archivo = firmar_archivo(ruta)
                 evidencia_model.crear(
-                    zona_info["IdZona"], ruta, "Foto", hash_archivo,
+                    camara["IdZona"], ruta, "Foto", hash_archivo,
                     id_usuario=self.usuario["IdUsuario"], id_incidencia=id_incidencia,
                 )
                 # la alerta a Telegram es precisamente el "aviso externo silencioso"
                 # de la propuesta: no suena nada en el local, pero llega al celular
                 telegram_service.enviar_foto_async(
                     ruta,
-                    f"🆘 MODO PANICO SILENCIOSO activado en Ingreso\nSHA-256: {hash_archivo}",
+                    f"🆘 MODO PANICO SILENCIOSO activado en {camara['Nombre']}\nSHA-256: {hash_archivo}",
                     al_terminar=self._puente_telegram.resultado.emit,
                 )
 
@@ -718,10 +726,10 @@ class MonitoreoController:
         self.view.set_boton_confirmar_urgente(False)
         QApplication.beep()
         fatiga_model.registrar(self.usuario["IdUsuario"], False, self.obtener_turno_actual())
-        zona_info = self.zonas_por_nombre.get("Ingreso")
-        if zona_info:
+        camara = self._camara_panico()
+        if camara:
             incidencia_model.crear(
-                zona_info["IdZona"], "Fatiga", "Vigilante no confirmo atencion a tiempo",
+                camara["IdZona"], "Fatiga", "Vigilante no confirmo atencion a tiempo",
                 id_turno=self.obtener_turno_actual(), severidad="Alta",
             )
         self.view.registrar_evento("[FATIGA] El vigilante no confirmo a tiempo. Incidencia registrada.")
@@ -733,8 +741,8 @@ class MonitoreoController:
         alarma_service.detener_sirena()
         for hilo in self.hilos_camara.values():
             hilo.detener()
-        if self.hilo_voz:
-            self.hilo_voz.detener()
+        for hilo in self._hilos_voz_terminando:
+            hilo.soltar()
         if self.detector_panico:
             self.detector_panico.detener()
         self.fatiga.detener()
@@ -747,7 +755,7 @@ class MonitoreoController:
         for hilo in hilos:
             hilo.detener()
             hilo.wait(max(100, int((limite - time.time()) * 1000)))
-        if self.hilo_voz:
-            self.hilo_voz.wait(1500)
+        for hilo in list(self._hilos_voz_terminando):
+            hilo.wait(1500)
         if self.detector_panico:
             self.detector_panico.wait(1500)

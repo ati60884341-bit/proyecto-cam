@@ -127,26 +127,25 @@ footer a{color:var(--accent);}
 <div class="paso">
   <div class="burbuja">2</div>
   <div class="contenido">
-    <p>Completa <code>Zona</code> (el nombre del lugar que vigila, ej. "Patio") y <code>Nombre</code> (como quieres llamarla, ej. "Cam-Patio-01"). Elige su <code>Marca</code>.</p>
+    <p>Escribe un <code>Nombre</code> (ej. "Puerta principal": así aparece en el Centro de Monitoreo) y elige el <code>Tipo</code>: <strong>Cámara IP</strong> o <strong>Webcam USB</strong>.</p>
   </div>
 </div>
 
 <figure class="mockup" style="position:relative; margin-top:-6px;">
-  <div class="titulo-mockup">Pestaña "Cámaras" — Agregar cámara</div>
+  <div class="titulo-mockup">Pestaña "Cámaras" — Agregar una cámara suelta</div>
   <div class="fila-campos">
-    <div class="campo"><label>Zona</label><div class="caja">Patio</div></div>
-    <div class="campo"><label>Nombre</label><div class="caja">Cam-Patio-01</div></div>
+    <div class="campo"><label>Nombre</label><div class="caja">Puerta principal</div></div>
+    <div class="campo"><label>Tipo</label><div class="caja">Camara IP (WiFi o cable de red) ▾</div></div>
   </div>
   <div class="fila-campos">
     <div class="campo"><label>Marca</label><div class="caja">Hikvision ▾</div></div>
-    <div class="campo"><label>Conexion</label><div class="caja">RTSP ▾</div></div>
+    <div class="campo"><label>IP</label><div class="caja">192.168.1.64</div></div>
   </div>
-  <div class="campo"><label>IP del DVR/camara</label><div class="caja">192.168.1.64</div></div>
   <div class="fila-campos">
     <div class="campo"><label>Usuario</label><div class="caja">admin</div></div>
     <div class="campo"><label>Clave</label><div class="caja">••••••••</div></div>
   </div>
-  <div class="campo"><label>URL RTSP / indice USB (se arma sola)</label><div class="caja">rtsp://admin:•••@192.168.1.64:554/Streaming/Channels/101</div></div>
+  <div class="campo"><label>Enlace RTSP (se arma solo) — boton Copiar al lado</label><div class="caja">rtsp://admin:•••@192.168.1.64:554/Streaming/Channels/101</div></div>
   <span class="boton-mock secundario">Probar conexion</span>
   <span class="boton-mock">Agregar camara</span>
   <span class="marca-llamada" style="top:168px; left:18px;">3</span>
@@ -157,7 +156,7 @@ footer a{color:var(--accent);}
 <div class="paso">
   <div class="burbuja">3</div>
   <div class="contenido">
-    <p>Si la marca es <strong>Hikvision o Dahua</strong>, aparece un "Asistente de conexión al DVR": escribe ahí la IP, usuario, clave y canal — <strong>la URL de abajo se arma sola</strong>, no hace falta escribirla ni saber su formato.</p>
+    <p>Con <strong>marca, IP, usuario y clave</strong> el enlace RTSP <strong>se arma solo</strong> (Hikvision, Dahua, Tapo; en "Generico" completa la ruta del final). El botón <strong>Copiar</strong> lo pone en el portapapeles para probarlo en otro programa (ej. VLC). Puerto, canal y calidad están en "Opciones avanzadas".</p>
   </div>
 </div>
 
@@ -173,7 +172,7 @@ footer a{color:var(--accent);}
 <div class="paso">
   <div class="burbuja">5</div>
   <div class="contenido">
-    <p>¿La cámara tiene motor y se puede mover (sube/baja/gira)? Marca la casilla <strong>"Esta cámara tiene motor PTZ"</strong>. Si no estás seguro, déjala sin marcar — no afecta nada más, solo habilita los comandos de mover la cámara.</p>
+    <p>¿La cámara tiene motor y se puede mover (sube/baja/gira)? En "Opciones avanzadas" marca <strong>"Tiene motor PTZ"</strong>. Si no estás seguro, déjala sin marcar — no afecta nada más, solo habilita los comandos de mover la cámara.</p>
   </div>
 </div>
 
@@ -220,45 +219,49 @@ footer a{color:var(--accent);}
 </div>
 <div class="paso">
   <div class="burbuja">2</div>
-  <div class="contenido"><p>Completa el formulario <strong>una sola vez</strong>: nombre del grabador, marca, IP, usuario, clave, y <strong>cuántos canales tiene</strong> (lo dice la caja del equipo, o cuenta cuántas cámaras tiene cableadas).</p></div>
+  <div class="contenido"><p>Elige <strong>DVR</strong> o <strong>NVR</strong> (dos botones grandes) y completa <strong>una sola vez</strong>: nombre, marca, IP, usuario, clave y <strong>cuántos canales tiene</strong> (lista: 4, 8, 16, 32; lo dice la caja del equipo).</p></div>
 </div>
 
 <figure class="mockup" style="position:relative;">
-  <div class="titulo-mockup">Pestaña "NVR / DVR" — Registrar un DVR/NVR nuevo</div>
-  <div class="campo"><label>Nombre</label><div class="caja">DVR Patio Central</div></div>
+  <div class="titulo-mockup">Pestaña "NVR / DVR" — Agregar un grabador</div>
+  <div class="fila-campos">
+    <div class="campo"><label>Tipo</label><div class="caja"><strong>DVR</strong> · cámaras analógicas</div></div>
+    <div class="campo"><label>&nbsp;</label><div class="caja">NVR · cámaras IP</div></div>
+  </div>
+  <div class="campo"><label>Nombre</label><div class="caja">Patio Central</div></div>
   <div class="fila-campos">
     <div class="campo"><label>Marca</label><div class="caja">Hikvision ▾</div></div>
-    <div class="campo"><label>IP del grabador</label><div class="caja">192.168.1.64</div></div>
+    <div class="campo"><label>IP</label><div class="caja">192.168.1.64</div></div>
   </div>
   <div class="fila-campos">
     <div class="campo"><label>Usuario</label><div class="caja">admin</div></div>
     <div class="campo"><label>Clave</label><div class="caja">••••••••</div></div>
   </div>
-  <div class="campo"><label>Cantidad de canales</label><div class="caja">8</div></div>
-  <span class="boton-mock" style="margin-top:6px;">Registrar y detectar todos los canales</span>
-  <span class="marca-llamada" style="top:154px; left:70px;">3</span>
+  <div class="campo"><label>Canales</label><div class="caja">8 ▾</div></div>
+  <span class="boton-mock" style="margin-top:6px;">Agregar y buscar sus camaras</span>
+  <span class="marca-llamada" style="top:206px; left:70px;">3</span>
 </figure>
 
 <div class="paso">
   <div class="burbuja">3</div>
   <div class="contenido">
-    <p>Pulsa <strong>"Registrar y detectar todos los canales"</strong>. El sistema prueba canal por canal (verás "Probando canal 3 de 8..."); cada canal que responda se agrega solo, con su propia cámara visible de inmediato en el Centro de Monitoreo.</p>
+    <p>Pulsa <strong>"Agregar y buscar sus cámaras"</strong>. El sistema prueba canal por canal (verás "Probando canal 3 de 8..."); cada canal que responda se agrega solo y aparece de inmediato en el Centro de Monitoreo, agrupado bajo <strong>"DVR Patio Central"</strong> (o "NVR ...").</p>
   </div>
 </div>
 
-<div class="exito"><strong>Resultado esperado:</strong> en el registro de abajo aparece una línea por cada canal — <span class="mono">"Canal 1: conectado (1920x1080), agregado como zona..."</span>. Si un canal no respondió, no pasa nada: puedes agregarlo después con "Detectar canales nuevos".</div>
+<div class="exito"><strong>Resultado esperado:</strong> en el registro de abajo aparece una línea por cada canal — <span class="mono">"Canal 1: conectado (1920x1080), agregado como camara..."</span>. Si un canal no respondió, no pasa nada: puedes agregarlo después con "Detectar canales nuevos".</div>
 
 <figure class="mockup">
   <div class="titulo-mockup">Así se ve despues — pestaña "NVR / DVR"</div>
   <table class="tabla-mock">
-    <tr><th>ID</th><th>Nombre</th><th>Marca</th><th>IP</th><th>Canales</th><th>Cámaras activas</th></tr>
-    <tr><td>1</td><td>DVR Patio Central</td><td>Hikvision</td><td>192.168.1.64</td><td>8</td><td>6</td></tr>
+    <tr><th>ID</th><th>Tipo</th><th>Nombre</th><th>Marca</th><th>IP</th><th>Canales</th><th>Cámaras activas</th></tr>
+    <tr><td>1</td><td>DVR</td><td>Patio Central</td><td>Hikvision</td><td>192.168.1.64</td><td>8</td><td>6</td></tr>
   </table>
   <div class="registro-mock">
-    [DVR Patio Central] Grabador registrado. Probando sus 8 canales...<br>
-    [DVR Patio Central] Canal 1: <span class="ok">conectado</span> (1920x1080), agregado como zona "DVR Patio Central Canal 1".<br>
-    [DVR Patio Central] Canal 2: <span class="ok">conectado</span> (1920x1080), agregado como zona "DVR Patio Central Canal 2".<br>
-    [DVR Patio Central] Canal 5: sin respuesta (no se agregó).
+    [Patio Central] Grabador registrado. Probando sus 8 canales...<br>
+    [Patio Central] Canal 1: <span class="ok">conectado</span> (1920x1080), agregado como camara "Patio Central-Canal1".<br>
+    [Patio Central] Canal 2: <span class="ok">conectado</span> (1920x1080), agregado como camara "Patio Central-Canal2".<br>
+    [Patio Central] Canal 5: sin respuesta (no se agregó).
   </div>
 </figure>
 

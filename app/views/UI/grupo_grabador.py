@@ -66,6 +66,9 @@ class GrupoGrabador(QFrame):
     def cantidad(self):
         return len(self._tiles)
 
+    def tiles(self):
+        return list(self._tiles)
+
     def set_oculta(self, zona, oculta):
         if oculta and zona not in self._ocultas:
             self._ocultas.append(zona)

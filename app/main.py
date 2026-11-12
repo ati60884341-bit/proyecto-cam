@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from app.views.login_view import LoginView
 from app.views.UI.splash_view import SplashView
-from app.views.UI.tema import HOJA_ESTILOS_GLOBAL, aplicar_paleta_oscura
+from app.views.UI.tema import hoja_estilos_global, aplicar_paleta_oscura
 from app.views.UI.animacion_botones import AnimadorHoverBotones
 from app.controllers.auth_controller import AuthController
 
@@ -45,7 +45,7 @@ def main():
     # Tambien evita que la app dependa de si Windows esta en modo claro u
     # oscuro en cada laptop del equipo - ver app/views/UI/tema.py
     aplicar_paleta_oscura(app)
-    app.setStyleSheet(HOJA_ESTILOS_GLOBAL)
+    app.setStyleSheet(hoja_estilos_global())
     # atenuado suave al pasar el mouse sobre cualquier boton del programa,
     # sin tener que tocar cada pestana por separado - ver animacion_botones.py
     animador_hover = AnimadorHoverBotones(app)

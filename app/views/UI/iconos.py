@@ -136,7 +136,43 @@ def _manuales(pintor, r, color):
         pintor.drawLine(QPointF(cuerpo.left() + 3, y), QPointF(cuerpo.right() - 3, y))
 
 
+def _microfono(pintor, r, color):
+    _pluma(pintor, color, max(1.6, r.width() / 12))
+    ancho = r.width() * 0.36
+    capsula = QRectF(r.center().x() - ancho / 2, r.top() + r.height() * 0.08, ancho, r.height() * 0.52)
+    pintor.setBrush(QColor(color))
+    pintor.drawRoundedRect(capsula, ancho / 2, ancho / 2)
+    pintor.setBrush(Qt.BrushStyle.NoBrush)
+    arco = QRectF(r.left() + r.width() * 0.2, r.top() + r.height() * 0.2, r.width() * 0.6, r.height() * 0.55)
+    pintor.drawArc(arco, 200 * 16, 140 * 16)
+    base_y = r.top() + r.height() * 0.76
+    pintor.drawLine(QPointF(r.center().x(), base_y), QPointF(r.center().x(), r.bottom() - r.height() * 0.08))
+    pintor.drawLine(
+        QPointF(r.center().x() - r.width() * 0.16, r.bottom() - r.height() * 0.08),
+        QPointF(r.center().x() + r.width() * 0.16, r.bottom() - r.height() * 0.08),
+    )
+
+
+def _copiar(pintor, r, color):
+    _pluma(pintor, color)
+    pintor.drawRoundedRect(QRectF(r.left() + 6, r.top() + 2, r.width() - 9, r.height() - 9), 2, 2)
+    pintor.drawRoundedRect(QRectF(r.left() + 2, r.top() + 6, r.width() - 9, r.height() - 9), 2, 2)
+
+
+def _flecha_abajo(pintor, r, color):
+    pintor.setPen(Qt.PenStyle.NoPen)
+    pintor.setBrush(QColor(color))
+    pintor.drawPolygon(QPolygonF([
+        QPointF(r.left() + r.width() * 0.15, r.top() + r.height() * 0.3),
+        QPointF(r.right() - r.width() * 0.15, r.top() + r.height() * 0.3),
+        QPointF(r.center().x(), r.bottom() - r.height() * 0.25),
+    ]))
+
+
 _DIBUJANTES = {
+    "microfono": _microfono,
+    "copiar": _copiar,
+    "flecha_abajo": _flecha_abajo,
     "dashboard": _centro_monitoreo,
     "incidencias": _incidencias,
     "evidencias": _evidencias,
@@ -150,10 +186,7 @@ _DIBUJANTES = {
 }
 
 
-def icono(nombre, color="#ffffff", tamano=20):
-    """QIcon dibujado en el momento (no viene de un archivo): `color` admite
-    cualquier string que entienda QColor (ej. "#8b94a3" inactivo, "#36d6c9"
-    activo), asi el mismo icono sirve para los dos estados del boton."""
+def pixmap_icono(nombre, color="#ffffff", tamano=20):
     dibujante = _DIBUJANTES.get(nombre)
     pixmap = QPixmap(tamano, tamano)
     pixmap.fill(Qt.GlobalColor.transparent)
@@ -162,4 +195,11 @@ def icono(nombre, color="#ffffff", tamano=20):
         pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
         dibujante(pintor, QRectF(0, 0, tamano, tamano), color)
         pintor.end()
-    return QIcon(pixmap)
+    return pixmap
+
+
+def icono(nombre, color="#ffffff", tamano=20):
+    """QIcon dibujado en el momento (no viene de un archivo): `color` admite
+    cualquier string que entienda QColor (ej. "#8b94a3" inactivo, "#36d6c9"
+    activo), asi el mismo icono sirve para los dos estados del boton."""
+    return QIcon(pixmap_icono(nombre, color, tamano))

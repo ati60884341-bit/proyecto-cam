@@ -9,14 +9,22 @@ def listar(incluir_inactivas=False):
     filtro = "" if incluir_inactivas else "WHERE c.Estado = N'Activa'"
     # IdDispositivo/Canal/Dispositivo*: a que DVR/NVR pertenece la camara (NULL
     # si es independiente) - el Centro de Monitoreo las agrupa por grabador
-    return query(
+    camaras = query(
         "SELECT c.IdCamara, c.IdZona, z.Nombre AS Zona, c.Nombre, c.Marca, c.TipoConexion, c.UrlConexion, "
         "c.Estado, c.TienePTZ, c.IdDispositivo, c.Canal, "
-        "d.Nombre AS Dispositivo, d.Marca AS DispositivoMarca, d.IP AS DispositivoIP "
+        "d.Nombre AS Dispositivo, d.Tipo AS DispositivoTipo, d.Marca AS DispositivoMarca, d.IP AS DispositivoIP "
         "FROM cam.Camaras c JOIN cam.Zonas z ON z.IdZona = c.IdZona "
         f"LEFT JOIN cam.DispositivosDVR d ON d.IdDispositivo = c.IdDispositivo {filtro} "
-        "ORDER BY c.IdDispositivo, c.Canal, c.IdZona"
+        "ORDER BY c.IdDispositivo, c.Canal, c.IdCamara"
     )
+    # "Clave" identifica a cada camara en el Centro de Monitoreo (un recuadro
+    # por camara): es su nombre, salvo que datos viejos repitan un nombre
+    usadas = set()
+    for c in camaras:
+        clave = c["Nombre"] if c["Nombre"] not in usadas else f"{c['Nombre']} #{c['IdCamara']}"
+        usadas.add(clave)
+        c["Clave"] = clave
+    return camaras
 
 
 def actualizar_estado(id_camara, estado):

@@ -26,6 +26,18 @@ RESINCRONIZACION_PERIODICA_SEG = 600    # reconexion preventiva: limita cuanto s
                                          # y el atraso ahora lo vigila ATRASO_MAXIMO_SEG
 ATRASO_MAXIMO_SEG = 1.5                 # si el video va mas de esto detras del tiempo real, se resincroniza
 CALIDAD_JPEG_BUFFER = 85                # "maquina del tiempo" comprimida (ver CamaraThread._buffer)
+FPS_WEBCAM = 30                         # la webcam local da 30 fps de verdad; los DVR/NVR, CAPTURA_FPS
+# exposicion de la webcam (escala de DirectShow: 2^n segundos). Con la
+# automatica del driver, en poca luz la webcam alarga la exposicion y cae a
+# ~5-8 fps (medido). Se controla a mano: -4 da ~24 fps y -3 ~13 fps. La
+# ganancia tiene tope bajo: con ganancia alta el sensor pierde el color y la
+# imagen queda gris (medido: saturacion 8 con ganancia 124, 25 con 80), asi
+# que con poca luz se prefiere bajar a -3 antes que subir la ganancia.
+EXPOSICION_WEBCAM_RAPIDA = -7
+EXPOSICION_WEBCAM_FLUIDA = -4
+EXPOSICION_WEBCAM_LENTA = -3
+GANANCIA_WEBCAM_MAXIMA = 80
+BRILLO_OBJETIVO = (80, 160)
 
 
 def _abrir_captura(tipo_conexion, url_conexion):
@@ -34,7 +46,16 @@ def _abrir_captura(tipo_conexion, url_conexion):
             indice = int(url_conexion)
         except (TypeError, ValueError):
             indice = 0
-        return cv2.VideoCapture(indice, cv2.CAP_DSHOW)
+        cap = cv2.VideoCapture(indice, cv2.CAP_DSHOW)
+        # por defecto DirectShow abre la webcam a 640x480: se pide HD en MJPG
+        # (comprimido en la camara: el USB alcanza para 720p a 30 fps sin
+        # atraso). Si la webcam no lo soporta, se queda con lo que tenga.
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        cap.set(cv2.CAP_PROP_FPS, FPS_WEBCAM)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        return cap
 
     # los timeouts van COMO PARAMETROS de open(): fijarlos con cap.set() antes
     # de abrir (como se hacia) OpenCV los ignora y usa su default de 30s. Eso
@@ -237,11 +258,12 @@ class CamaraThread(QThread):
         self.tipo_conexion = tipo_conexion
         self.url_conexion = url_conexion
         self._activo = True
+        self._fps = FPS_WEBCAM if tipo_conexion == "USB" else CAPTURA_FPS
 
         # los ultimos BUFFER_SEGUNDOS en JPEG, no en crudo: un frame 1080p
         # crudo pesa 6.2 MB (8 s = ~500 MB por camara, la app llego a 1.1 GB
         # con 2 camaras); en JPEG son ~325 KB (~26 MB por camara)
-        self._buffer = deque(maxlen=BUFFER_SEGUNDOS * CAPTURA_FPS)
+        self._buffer = deque(maxlen=BUFFER_SEGUNDOS * self._fps)
         self._ultimo_frame = None
         self._baseline_brillo = None
         self._baseline_bordes = None
@@ -275,8 +297,11 @@ class CamaraThread(QThread):
 
     def _actualizar_sabotaje(self, frame):
         gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        brillo = float(gris.mean())
-        desviacion = float(gris.std())
+        # meanStdDev de OpenCV: mismo resultado que numpy mean/std pero ~10x
+        # mas rapido (std de numpy tomaba ~12 ms por cuadro y bajaba los fps)
+        media, desv = cv2.meanStdDev(gris)
+        brillo = float(media[0][0])
+        desviacion = float(desv[0][0])
         chico = cv2.resize(gris, (320, 240), interpolation=cv2.INTER_AREA)
         bordes = float((cv2.Canny(cv2.GaussianBlur(chico, (5, 5), 0), 40, 120) > 0).mean() * 100)
 
@@ -324,19 +349,66 @@ class CamaraThread(QThread):
         base = f"sabotaje_{self.zona}_{marca_tiempo}".replace(" ", "_")
 
         # foto ~2 segundos antes del bloqueo (el rostro del culpable acercandose)
-        indice_foto = max(0, len(frames) - 2 * CAPTURA_FPS)
+        indice_foto = max(0, len(frames) - 2 * self._fps)
         ruta_foto = os.path.join(EVIDENCIAS_DIR, base + ".jpg")
         cv2.imwrite(ruta_foto, frames[indice_foto])
 
         # video con los BUFFER_SEGUNDOS previos al bloqueo (la "maquina del tiempo")
         alto, ancho = frames[0].shape[:2]
         ruta_video = os.path.join(EVIDENCIAS_DIR, base + ".avi")
-        escritor = cv2.VideoWriter(ruta_video, cv2.VideoWriter_fourcc(*"XVID"), CAPTURA_FPS, (ancho, alto))
+        escritor = cv2.VideoWriter(ruta_video, cv2.VideoWriter_fourcc(*"XVID"), self._fps, (ancho, alto))
         for f in frames:
             escritor.write(f)
         escritor.release()
 
         self.sabotaje_detectado.emit(self.zona, ruta_video, ruta_foto)
+
+    def _iniciar_exposicion_webcam(self, captura):
+        captura.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # 0.25 = manual en DirectShow
+        self._exposicion = EXPOSICION_WEBCAM_FLUIDA
+        captura.set(cv2.CAP_PROP_EXPOSURE, self._exposicion)
+        self._ganancia_original = captura.get(cv2.CAP_PROP_GAIN)
+        self._ganancia = min(self._ganancia_original, GANANCIA_WEBCAM_MAXIMA)
+        captura.set(cv2.CAP_PROP_GAIN, self._ganancia)
+
+    def _poner_exposicion(self, captura, exposicion):
+        subir = exposicion > self._exposicion
+        self._exposicion = exposicion
+        captura.set(cv2.CAP_PROP_EXPOSURE, exposicion)
+        # un paso de exposicion duplica (o divide) el brillo: la linea base
+        # del sabotaje acompana, para no tomarlo como camara tapada
+        if self._baseline_brillo is not None:
+            self._baseline_brillo = min(255.0, self._baseline_brillo * (2 if subir else 0.5))
+
+    def _poner_ganancia(self, captura, ganancia):
+        if ganancia < 0 or not captura.set(cv2.CAP_PROP_GAIN, ganancia):
+            return False
+        self._ganancia = ganancia
+        return True
+
+    def _ajustar_exposicion_webcam(self, captura, frame):
+        """Un paso por llamada, y pasos chicos de ganancia: un salto de brillo
+        grande se confundiria con una camara tapada. Con poca luz: exposicion
+        hasta la fluida, ganancia hasta su tope, y recien ahi la lenta. Con
+        mucha luz, al reves."""
+        brillo = float(frame[::8, ::8].mean())
+        minimo, maximo = BRILLO_OBJETIVO
+        if minimo <= brillo <= maximo:
+            return
+        if brillo < minimo:
+            if self._exposicion < EXPOSICION_WEBCAM_FLUIDA:
+                self._poner_exposicion(captura, self._exposicion + 1)
+            elif self._ganancia + 6 <= GANANCIA_WEBCAM_MAXIMA and self._poner_ganancia(captura, self._ganancia + 6):
+                pass
+            elif self._exposicion < EXPOSICION_WEBCAM_LENTA:
+                self._poner_exposicion(captura, self._exposicion + 1)
+        else:
+            if self._exposicion > EXPOSICION_WEBCAM_FLUIDA:
+                self._poner_exposicion(captura, self._exposicion - 1)
+            elif self._poner_ganancia(captura, self._ganancia - 6):
+                pass
+            elif self._exposicion > EXPOSICION_WEBCAM_RAPIDA:
+                self._poner_exposicion(captura, self._exposicion - 1)
 
     def run(self):
         # bucle externo: (re)conecta; si la transmision se degrada de forma
@@ -351,6 +423,8 @@ class CamaraThread(QThread):
                 continue
 
             self._forzar_reconexion = False  # descarta pedidos de reconexion viejos, ya se reconecto
+            if self.tipo_conexion == "USB":
+                self._iniciar_exposicion_webcam(captura)
 
             self.estado_cambiado.emit("conectada")
             razon = self._transmitir(captura)
@@ -367,6 +441,11 @@ class CamaraThread(QThread):
                 # quieto en pantalla (no lo borra) en vez de taparlo con el
                 # aviso de error, mientras se reconecta en segundo plano.
                 self.estado_cambiado.emit("reconectando")
+            if self.tipo_conexion == "USB":
+                # el driver recuerda el modo manual: se devuelve la webcam en
+                # automatico para que Zoom/Teams/etc. no la vean oscura
+                captura.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+                captura.set(cv2.CAP_PROP_GAIN, self._ganancia_original)
             captura.release()
 
     def _transmitir(self, captura):
@@ -374,9 +453,12 @@ class CamaraThread(QThread):
         degrade. Devuelve "fallo" (desconexion real: hay que avisar "sin
         senal"), "resync" (reconexion pedida o preventiva: no es un error,
         no hay que avisar nada) o "detenido" (se esta apagando la app)."""
-        intervalo = 1.0 / CAPTURA_FPS
+        # 10% de margen: con el intervalo justo, un frame real que llegaba
+        # apenas antes de tiempo (jitter) se salteaba y el video daba saltos
+        intervalo = 0.9 / self._fps
         fallos_seguidos = 0
         ultimo_procesado = 0.0
+        ultimo_ajuste_exposicion = 0.0
         inicio_transmision = time.time()
         es_rtsp = self.tipo_conexion != "USB"
         # vigilancia de atraso: reloj de la PC menos marca de tiempo del video
@@ -421,6 +503,9 @@ class CamaraThread(QThread):
             if ahora - ultimo_procesado < intervalo:
                 continue
             ultimo_procesado = ahora
+            if not es_rtsp and ahora - ultimo_ajuste_exposicion > 1.5:
+                ultimo_ajuste_exposicion = ahora
+                self._ajustar_exposicion_webcam(captura, frame)
 
             self._ultimo_frame = frame
             # deteccion ANTES de pintar y de comprimir: el aviso sale apenas se ve tapada

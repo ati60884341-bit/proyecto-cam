@@ -21,7 +21,12 @@ paleta de Qt oscura de verdad para esos casos, para que la app se vea
 igual en las 4 laptops del equipo sin importar si Windows esta en modo
 claro u oscuro en cada una."""
 
+import os
+import tempfile
+
 from PyQt6.QtGui import QColor, QPalette
+
+from app.views.UI.iconos import pixmap_icono
 
 # mismos colores que el resto del tema, para que cualquier vista con graficos
 # propios (matplotlib, etc. - ver reportes_view.py) no invente los suyos
@@ -75,7 +80,8 @@ QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {
     background: #171b24; color: #e7e9ee; border: 1px solid #2a303c; border-radius: 7px; padding: 5px 8px;
 }
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus { border-color: #36d6c9; }
-QComboBox::drop-down { border: none; width: 22px; }
+QComboBox::drop-down { border: none; border-left: 1px solid #2a303c; width: 26px; }
+QComboBox::down-arrow { image: url(__FLECHA__); width: 12px; height: 12px; }
 QComboBox QAbstractItemView {
     background: #171b24; color: #e7e9ee; border: 1px solid #2a303c;
     selection-background-color: rgba(54, 214, 201, 45); selection-color: #ffffff;
@@ -111,3 +117,14 @@ QScrollBar::handle:horizontal { background: rgba(255, 255, 255, 40); border-radi
 QScrollBar::handle:horizontal:hover { background: rgba(54, 214, 201, 110); }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
 """
+
+
+def hoja_estilos_global():
+    """La hoja de arriba con la flechita de los desplegables: al darle
+    estilo a QComboBox, Qt deja de dibujar su flecha y no se notaba que era
+    una lista. La flecha se dibuja al vuelo (iconos.py) y se guarda como
+    PNG temporal, porque una hoja de estilos solo acepta imagenes por ruta.
+    Necesita la QApplication ya creada."""
+    ruta = os.path.join(tempfile.gettempdir(), "proyectocam_flecha_abajo.png")
+    pixmap_icono("flecha_abajo", COLOR_TEXTO_MUTED, 24).save(ruta, "PNG")
+    return HOJA_ESTILOS_GLOBAL.replace("__FLECHA__", ruta.replace("\\", "/"))

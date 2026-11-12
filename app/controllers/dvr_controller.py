@@ -47,11 +47,15 @@ class DvrController:
 
     # ---------------- registrar + detectar todos los canales ----------------
     def registrar(self, datos):
+        # sus camaras se llaman "<nombre>-CanalN": dos grabadores con el mismo nombre se confundirian
+        if any(d["Nombre"].lower() == datos["nombre"].lower() for d in self._dispositivos):
+            QMessageBox.warning(self.view, "Nombre repetido", f"Ya hay un grabador llamado \"{datos['nombre']}\". Use otro nombre.")
+            return
         try:
             id_dispositivo = dispositivo_dvr_model.crear(
                 datos["nombre"], datos["marca"], datos["ip"], int(datos["puerto"]),
                 datos["usuario"], datos["clave"], datos["cantidad_canales"],
-                canales_ptz=datos.get("tiene_ptz", False),
+                canales_ptz=datos.get("tiene_ptz", False), tipo=datos.get("tipo", "DVR"),
             )
         except Exception as exc:
             traceback.print_exc()
@@ -142,18 +146,20 @@ class DvrController:
                 self.view.registrar_evento(f"[{nombre_dispositivo}] Canal {canal}: no se pudo agregar ({exc}).")
                 continue
 
+            nombre_camara = f"{nombre_dispositivo}-Canal{canal}"
             self.view.registrar_evento(
                 f"[{nombre_dispositivo}] Canal {canal}: conectado ({canal_info['resolucion']}), "
-                f"agregado como zona \"{zona_nombre}\"."
+                f"agregado como camara \"{nombre_camara}\"."
             )
             camara_completa = {
                 "IdCamara": id_camara, "IdZona": zona["IdZona"], "Zona": zona_nombre,
-                "Nombre": f"{nombre_dispositivo}-Canal{canal}", "Marca": marca,
+                "Nombre": nombre_camara, "Clave": nombre_camara, "Marca": marca,
                 "TipoConexion": "RTSP", "UrlConexion": canal_info["url"], "Estado": "Activa",
                 "TienePTZ": tiene_ptz,
                 # para agruparla bajo su grabador en el Centro de Monitoreo
                 "IdDispositivo": id_dispositivo, "Canal": canal,
                 "Dispositivo": nombre_dispositivo, "DispositivoMarca": marca,
+                "DispositivoTipo": dispositivo["Tipo"] if dispositivo else None,
                 "DispositivoIP": dispositivo["IP"] if dispositivo else None,
             }
             self.on_camara_agregada(camara_completa)
@@ -172,7 +178,7 @@ class DvrController:
         camaras = dispositivo_dvr_model.camaras_del_dispositivo(id_dispositivo)
         for camara in camaras:
             camara_model.actualizar_estado(camara["IdCamara"], "Inactiva")
-            self.on_camara_quitada(camara["Zona"])
+            self.on_camara_quitada(camara["IdCamara"])
 
         try:
             dispositivo_dvr_model.eliminar(id_dispositivo)

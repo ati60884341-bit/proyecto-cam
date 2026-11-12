@@ -10,7 +10,7 @@ class ZonaAmpliadaDialog(QDialog):
 
     def __init__(self, nombre_zona, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Zona ampliada: {nombre_zona}")
+        self.setWindowTitle(f"Camara ampliada: {nombre_zona}")
         self.resize(*tamano_adaptado(900, 650))
         layout = QVBoxLayout(self)
         self.video_label = QLabel("Cargando video...")
@@ -19,5 +19,4 @@ class ZonaAmpliadaDialog(QDialog):
         layout.addWidget(self.video_label)
 
     def mostrar_frame(self, frame_bgr):
-        pixmap = frame_a_pixmap(frame_bgr, self.video_label.width(), self.video_label.height())
-        self.video_label.setPixmap(pixmap)
+        self.video_label.setPixmap(frame_a_pixmap(frame_bgr, self.video_label))

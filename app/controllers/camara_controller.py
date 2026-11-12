@@ -34,13 +34,17 @@ class CamaraController:
         self.cargar()
 
     def cargar(self):
-        self.view.set_zonas_disponibles([z["Nombre"] for z in zona_model.listar()])
         self._camaras = camara_model.listar()
         self.view.cargar(self._camaras)
 
     def agregar(self, datos):
+        # el nombre identifica a la camara en el Centro de Monitoreo y por voz
+        if any(c["Nombre"].lower() == datos["nombre"].lower() for c in camara_model.listar()):
+            QMessageBox.warning(self.view, "Nombre repetido", f"Ya hay una camara llamada \"{datos['nombre']}\". Use otro nombre.")
+            return
         try:
-            zona = zona_model.obtener_o_crear(datos["zona"])
+            # cada camara suelta es su propio lugar (zona) para incidencias/evidencias
+            zona = zona_model.obtener_o_crear(datos["nombre"])
             id_camara = camara_model.crear(
                 zona["IdZona"], datos["nombre"], datos["marca"], datos["tipo_conexion"], datos["url"],
                 tiene_ptz=datos.get("tiene_ptz", False),
@@ -51,10 +55,11 @@ class CamaraController:
             return
         camara_completa = {
             "IdCamara": id_camara, "IdZona": zona["IdZona"], "Zona": zona["Nombre"],
-            "Nombre": datos["nombre"], "Marca": datos["marca"],
+            "Nombre": datos["nombre"], "Clave": datos["nombre"], "Marca": datos["marca"],
             "TipoConexion": datos["tipo_conexion"], "UrlConexion": datos["url"], "Estado": "Activa",
             "TienePTZ": datos.get("tiene_ptz", False),
         }
+        self.view.limpiar_formulario()
         self.cargar()
         # la confirmacion se ve en la bitacora del Centro de Monitoreo (sin
         # dialogo modal, para no interrumpir el flujo de la demo)
@@ -103,7 +108,7 @@ class CamaraController:
         if not camara:
             return
         confirmacion = QMessageBox.question(
-            self.view, "Confirmar", f"¿Quitar la camara \"{camara['Nombre']}\" de la zona \"{camara['Zona']}\"?"
+            self.view, "Confirmar", f"¿Quitar la camara \"{camara['Nombre']}\"?"
         )
         if confirmacion != QMessageBox.StandardButton.Yes:
             return
@@ -114,4 +119,4 @@ class CamaraController:
             QMessageBox.warning(self.view, "No se pudo quitar la camara", str(exc))
             return
         self.cargar()
-        self.on_camara_quitada(camara["Zona"])
+        self.on_camara_quitada(id_camara)

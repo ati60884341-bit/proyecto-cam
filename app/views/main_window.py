@@ -58,15 +58,12 @@ class MainWindow(QMainWindow):
         layout_raiz.setSpacing(0)
 
         # -------- barra lateral --------
-        # misma escena nocturna animada del splash/login (el GIF real, no
-        # una recreacion) - se probo primero quieta aca por cuidar CPU/GPU
-        # frente a los hilos de video de cada camara en vivo, pero el GIF es
-        # chico (720x364) y decodificarlo de fondo no compite de verdad con
-        # eso; si en el futuro se nota mas lento con varias camaras a la
-        # vez, el primer sospechoso es esta linea (volver a animado=False).
+        # misma escena nocturna del splash/login, pero QUIETA: animada (GIF +
+        # estrellas repintando ~16 veces por segundo) bajaba la webcam de
+        # ~17 a ~11 fps con 9 camaras (medido). El splash/login si se animan.
         # overlay 0.4: a mas oscuro, mas "aplastaba" el detalle de la imagen
         # (colinas/arbol) hasta verse borroso en vez de nitido
-        barra = FondoNocturno(animado=True, opacidad_superposicion=0.4)
+        barra = FondoNocturno(animado=False, opacidad_superposicion=0.4)
         barra.setObjectName("barraLateral")
         barra.setFixedWidth(210)
         barra.setStyleSheet(_ESTILO_NAV)

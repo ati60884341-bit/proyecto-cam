@@ -3,10 +3,6 @@ DVR/NVR a partir de IP + usuario + clave + canal. La comparten la pestana
 "Camaras" (una camara a la vez) y la pestana "NVR / DVR" (todos los canales
 de un dispositivo de una sola vez)."""
 
-# Marcas de DVR/NVR cuya URL RTSP se puede armar sola: no hace falta
-# escribirla ni recordar su formato exacto.
-MARCAS_CON_ASISTENTE_DVR = ("Hikvision", "Dahua")
-
 
 def construir_url_canal(marca, ip, puerto, usuario, clave, canal, flujo_principal=True):
     """canal: numero de canal del DVR/NVR (1, 2, 3...), NO el indice de una
@@ -25,4 +21,7 @@ def construir_url_canal(marca, ip, puerto, usuario, clave, canal, flujo_principa
     if marca == "Dahua":
         subtype = "0" if flujo_principal else "1"
         return f"rtsp://{usuario}:{clave}@{ip}:{puerto}/cam/realmonitor?channel={canal}&subtype={subtype}"
-    return ""
+    if marca == "Tapo":
+        return f"rtsp://{usuario}:{clave}@{ip}:{puerto}/stream{'1' if flujo_principal else '2'}"
+    # generica: la ruta del stream cambia por fabricante, el instalador la completa
+    return f"rtsp://{usuario}:{clave}@{ip}:{puerto}/"

@@ -52,6 +52,10 @@ pestana (ver seccion 4) corra tambien `db/10_perfiles_sitio.sql` (agrega
 `cam.PerfilesSitio`) y `db/11_bitacora_instalacion.sql` (agrega
 `cam.BitacoraInstalacion`) — ninguna borra nada existente.
 
+Para que el Centro de Monitoreo agrupe cada grabador como "DVR" o "NVR",
+corra `db/12_tipo_grabador.sql` (agrega la columna `Tipo`; obligatoria: sin
+ella la app no lista las camaras).
+
 Si ya probo la app con los datos de ejemplo de `03_seed.sql` (zonas
 Ingreso/Patio/Estacionamiento/Pasillo con camaras simuladas) y ahora va a
 trabajar con camaras reales, corra `db/08_zonas_ejemplo.sql` y despues

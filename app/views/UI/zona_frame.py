@@ -8,21 +8,29 @@ ESTILO_SABOTAJE = "QFrame#zonaFrame { border: 3px solid #e53935; border-radius: 
 ESTILO_SIN_SENAL = "QFrame#zonaFrame { border: 3px solid #555; border-radius: 6px; background: #1a1a1a; }"
 
 
-def frame_a_pixmap(frame_bgr, ancho_destino, alto_destino):
+def frame_a_pixmap(frame_bgr, etiqueta):
+    """Escala con OpenCV (INTER_AREA: mas nitido que el suavizado de Qt al
+    achicar) y a los pixeles REALES de la pantalla: con Windows al 125-150%
+    la imagen se armaba al tamano logico y Qt la estiraba, viendose borrosa."""
+    escala_pantalla = etiqueta.devicePixelRatioF()
+    alto, ancho = frame_bgr.shape[:2]
+    factor = min(etiqueta.width() * escala_pantalla / ancho, etiqueta.height() * escala_pantalla / alto)
+    destino = (max(1, int(ancho * factor)), max(1, int(alto * factor)))
+    if destino != (ancho, alto):
+        interpolacion = cv2.INTER_AREA if factor < 1 else cv2.INTER_CUBIC
+        frame_bgr = cv2.resize(frame_bgr, destino, interpolation=interpolacion)
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-    alto, ancho, _ = rgb.shape
-    imagen = QImage(rgb.data, ancho, alto, 3 * ancho, QImage.Format.Format_RGB888)
-    return QPixmap.fromImage(imagen).scaled(
-        ancho_destino, alto_destino,
-        Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
-    )
+    alto, ancho = rgb.shape[:2]
+    pixmap = QPixmap.fromImage(QImage(rgb.data, ancho, alto, 3 * ancho, QImage.Format.Format_RGB888))
+    pixmap.setDevicePixelRatio(escala_pantalla)
+    return pixmap
 
 
 class ZonaFrame(QFrame):
-    """QFrame que representa una de las 4 zonas de la maqueta: video en vivo +
-    estado + boton de captura manual de evidencia."""
+    """Recuadro de UNA camara: numero para la voz, video en vivo, estado y
+    botones. nombre_zona es la clave de la camara (su nombre)."""
 
-    capturar_evidencia = pyqtSignal(str)   # nombre de zona
+    capturar_evidencia = pyqtSignal(str)   # clave de la camara
     ampliar_zona = pyqtSignal(str)
     reconectar_zona = pyqtSignal(str)
     ocultar_zona = pyqtSignal(str)
@@ -38,9 +46,22 @@ class ZonaFrame(QFrame):
         layout = QVBoxLayout(self)
 
         fila_titulo = QHBoxLayout()
-        self.titulo = QLabel(f"{nombre_zona}  —  {nombre_camara}")
+        self.lbl_numero = QLabel()
+        self.lbl_numero.setFixedSize(30, 30)
+        self.lbl_numero.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_numero.setStyleSheet(
+            "background: #36d6c9; color: #06201d; font-weight: bold; font-size: 14px; border-radius: 15px;"
+        )
+        fila_titulo.addWidget(self.lbl_numero)
+        columna_titulo = QVBoxLayout()
+        columna_titulo.setSpacing(0)
+        self.titulo = QLabel(nombre_camara)
         self.titulo.setStyleSheet("color: white; font-weight: bold;")
-        fila_titulo.addWidget(self.titulo, stretch=1)
+        columna_titulo.addWidget(self.titulo)
+        self.lbl_voz = QLabel()
+        self.lbl_voz.setStyleSheet("color: #7fd6e8; font-size: 11px;")
+        columna_titulo.addWidget(self.lbl_voz)
+        fila_titulo.addLayout(columna_titulo, stretch=1)
         # suspende la camara (deja de conectarse y de verse) sin borrarla:
         # se vuelve a mostrar desde el menu "Ocultas" de su grupo
         self.btn_ocultar = QPushButton("Ocultar")
@@ -58,7 +79,8 @@ class ZonaFrame(QFrame):
         self.video_label.setStyleSheet("color: #aaa; background: black;")
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_label.setMinimumHeight(150)
-        self.video_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # Ignored: el tamano del pixmap no empuja al recuadro a crecer frame a frame
+        self.video_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         layout.addWidget(self.video_label)
 
         self.estado_label = QLabel("Estado: conectando...")
@@ -80,9 +102,12 @@ class ZonaFrame(QFrame):
         fila_botones.addWidget(self.btn_reconectar)
         layout.addLayout(fila_botones)
 
+    def set_numero(self, numero):
+        self.lbl_numero.setText(str(numero))
+        self.lbl_voz.setText(f'Por voz: "camara {numero}"')
+
     def mostrar_frame(self, frame_bgr):
-        pixmap = frame_a_pixmap(frame_bgr, self.video_label.width(), self.video_label.height())
-        self.video_label.setPixmap(pixmap)
+        self.video_label.setPixmap(frame_a_pixmap(frame_bgr, self.video_label))
 
     def actualizar_estado(self, estado):
         if estado == "conectada":

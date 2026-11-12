@@ -78,10 +78,10 @@ footer a{color:var(--accent);}
 
 <p class="chip">Manual 2 de 3</p>
 <h1>Hablarle al sistema</h1>
-<p class="subtitulo">Cómo activar el micrófono y qué decir para mover cámaras, capturar evidencia y controlar el sistema sin tocar el mouse.</p>
+<p class="subtitulo">Cómo usar el botón del micrófono y qué decir para ampliar, hacer zoom, mover cámaras y capturar evidencia sin tocar el mouse.</p>
 
 <nav class="indice">
-  <a href="#microfono">Activar el micrófono</a>
+  <a href="#microfono">Usar el micrófono</a>
   <a href="#formato">Cómo armar un comando</a>
   <a href="#tabla">Todos los comandos</a>
   <a href="#ptz">Mover la cámara (PTZ)</a>
@@ -90,48 +90,40 @@ footer a{color:var(--accent);}
 
 <div id="microfono"></div>
 <div class="etiqueta-seccion"><span class="num">1</span><hr></div>
-<h2>Activar el micrófono</h2>
+<h2>Usar el micrófono</h2>
 
 <div class="paso">
   <div class="burbuja">1</div>
-  <div class="contenido"><p>En el <strong>Centro de Monitoreo</strong>, busca el cuadro <strong>"Asistente de comandos de voz"</strong> en el panel de la derecha.</p></div>
+  <div class="contenido"><p>En el <strong>Centro de Monitoreo</strong>, panel derecho, cuadro <strong>"Asistente de comandos de voz"</strong>: elige tu micrófono real en el desplegable (no "por defecto de Windows", que puede seguir apuntando a unos audífonos Bluetooth ya desconectados).</p></div>
 </div>
 
 <figure class="mockup" style="position:relative;">
   <div class="titulo-mockup">Centro de Monitoreo — Asistente de comandos de voz</div>
   <div class="campo"><label>Microfono (elija el real si no reconoce bien)</label><div class="caja">Microfono (High Definition Audio Device) ▾</div></div>
-  <div class="checkfila">Activar microfono (manos libres)</div>
-  <div class="campo"><label></label><div class="caja" style="color:var(--fg-muted);">Asistente escuchando...</div></div>
-  <span class="marca-llamada" style="top:62px; left:18px;">2</span>
-  <span class="marca-llamada" style="top:112px; left:18px;">3</span>
+  <div class="campo" style="text-align:center;"><div class="caja" style="display:inline-block; border-radius:999px; padding:18px 22px;">micrófono</div></div>
+  <div class="campo"><label></label><div class="caja" style="color:var(--fg-muted); text-align:center;">Mantenga apretado para hablar</div></div>
 </figure>
 
 <div class="paso">
   <div class="burbuja">2</div>
   <div class="contenido">
-    <p>Elige tu micrófono real en el desplegable de arriba, en vez de dejar "Microfono por defecto de Windows". Esto evita el problema más común: que Windows siga apuntando a unos audífonos Bluetooth que ya desconectaste.</p>
+    <p><strong>Mantén apretado</strong> el botón redondo del micrófono, di la frase completa (ej. <span class="frase">camara 1 zoom</span>) y <strong>suelta</strong>. El botón se pone rojo mientras graba.</p>
   </div>
 </div>
 
-<div class="paso">
-  <div class="burbuja">3</div>
-  <div class="contenido">
-    <p>Marca <strong>"Activar microfono"</strong>. Puede tardar unos segundos en decir <code>"Asistente escuchando..."</code> — es normal, está calibrando el micrófono.</p>
-  </div>
-</div>
-
-<div class="aviso"><strong>No hace falta decir "Ok sistema" ni nada parecido</strong>Apenas actives la casilla, el sistema ya está escuchando cada frase que digas y la compara con los comandos de la tabla de abajo.</div>
+<div class="aviso"><strong>Escucha solo mientras lo mantienes apretado</strong>Así toma la frase entera aunque hagas una pausa entre palabras, y no reacciona a conversaciones de fondo. Necesita internet (el reconocimiento es de Google).</div>
 
 <div id="formato"></div>
 <div class="etiqueta-seccion"><span class="num">2</span><hr></div>
 <h2>Cómo arma un comando el sistema</h2>
-<p>Toda frase se interpreta igual: el sistema busca en lo que dijiste <strong>qué zona</strong> nombraste y <strong>qué acción</strong> pediste — en cualquier orden, y no importan los acentos.</p>
+<p>Toda frase se interpreta igual: el sistema busca <strong>qué cámara</strong> nombraste y <strong>qué acción</strong> pediste — en cualquier orden, y no importan los acentos.</p>
+<p><strong>Cómo nombrar una cámara:</strong> cada recuadro del Centro de Monitoreo tiene un <strong>número en un círculo</strong>. Di <span class="frase">camara</span> + ese número. También sirve una palabra propia de su nombre si ninguna otra cámara la tiene (ej. <span class="frase">ingreso</span> para "Cam-Ingreso-01").</p>
 
 <figure>
-  <svg viewBox="0 0 640 150" role="img" aria-label="La frase 'patio ampliar' se descompone en dos partes: la palabra patio se compara contra la lista de zonas y coincide con la zona Patio; la palabra ampliar se compara contra la lista de acciones y coincide con ampliar; el sistema combina ambas y amplía la cámara de Patio.">
+  <svg viewBox="0 0 640 150" role="img" aria-label="La frase 'camara 2 ampliar' se descompone en dos partes: camara 2 coincide con el recuadro numero 2; ampliar coincide con la accion ampliar; el sistema combina ambas y amplia la camara 2.">
     <g font-family="IBM Plex Mono, monospace" font-size="13">
       <rect x="14" y="58" width="150" height="34" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
-      <text x="89" y="80" text-anchor="middle">"patio ampliar"</text>
+      <text x="89" y="80" text-anchor="middle">"camara 2 ampliar"</text>
     </g>
     <defs>
       <marker id="fl2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -141,8 +133,8 @@ footer a{color:var(--accent);}
     <line x1="164" y1="68" x2="270" y2="30" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
     <line x1="164" y1="80" x2="270" y2="118" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
     <rect x="272" y="8" width="120" height="44" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <text x="332" y="26" text-anchor="middle" font-size="11" opacity="0.75">coincide con zona</text>
-    <text x="332" y="42" text-anchor="middle" font-size="13" font-weight="700">Patio</text>
+    <text x="332" y="26" text-anchor="middle" font-size="11" opacity="0.75">coincide con recuadro</text>
+    <text x="332" y="42" text-anchor="middle" font-size="13" font-weight="700">N.º 2</text>
     <rect x="272" y="96" width="120" height="44" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
     <text x="332" y="114" text-anchor="middle" font-size="11" opacity="0.75">coincide con accion</text>
     <text x="332" y="130" text-anchor="middle" font-size="13" font-weight="700">Ampliar</text>
@@ -150,32 +142,15 @@ footer a{color:var(--accent);}
     <line x1="392" y1="118" x2="470" y2="80" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
     <rect x="472" y="56" width="154" height="38" rx="8" fill="currentColor" opacity="0.1"/>
     <rect x="472" y="56" width="154" height="38" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
-    <text x="549" y="80" text-anchor="middle" font-size="12.5" font-weight="700">Amplía "Patio"</text>
+    <text x="549" y="80" text-anchor="middle" font-size="12.5" font-weight="700">Amplía la cámara 2</text>
   </svg>
-  <figcaption>El orden no importa: "ampliar patio" hace exactamente lo mismo que "patio ampliar".</figcaption>
+  <figcaption>El orden no importa: "ampliar camara 2" hace lo mismo que "camara 2 ampliar".</figcaption>
 </figure>
 
 <div class="nota">El campo de texto debajo del micrófono acepta las mismas frases escritas, sin necesitar micrófono — útil para probar o para un lugar con mucho ruido.</div>
 
-<h3>Si la zona es un canal de un DVR/NVR (nombre largo)</h3>
-<p>Las zonas que crea la pestaña "NVR / DVR" se llaman por ejemplo <span class="frase">DVR Patio Central Canal 3</span>. Repetir ese nombre completo por voz es incómodo — por eso, si hay una sola zona que termine en <code>Canal 3</code>, alcanza con decir <strong>"canal 3"</strong>:</p>
-
-<figure>
-  <svg viewBox="0 0 640 110" role="img" aria-label="Decir canal 3 ampliar coincide con la unica zona cuyo nombre termina en Canal 3, aunque esa zona se llame DVR Patio Central Canal 3.">
-    <g font-family="IBM Plex Mono, monospace" font-size="12.5">
-      <rect x="14" y="36" width="150" height="38" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
-      <text x="89" y="60" text-anchor="middle">"canal 3 ampliar"</text>
-      <line x1="164" y1="55" x2="300" y2="55" stroke="currentColor" stroke-width="1.4" marker-end="url(#fl2)"/>
-      <text x="232" y="42" text-anchor="middle" font-size="11" opacity="0.75">atajo: ¿una sola zona</text>
-      <text x="232" y="76" text-anchor="middle" font-size="11" opacity="0.75">termina en "canal 3"?</text>
-      <rect x="302" y="24" width="324" height="62" rx="8" fill="currentColor" opacity="0.1"/>
-      <rect x="302" y="24" width="324" height="62" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
-      <text x="464" y="50" text-anchor="middle" font-size="13" font-weight="700">DVR Patio Central Canal 3</text>
-      <text x="464" y="68" text-anchor="middle" font-size="11" opacity="0.75">(si, es la unica — coincide)</text>
-    </g>
-  </svg>
-  <figcaption>Si tienes dos grabadores con "Canal 3" cada uno, esta frase es ambigua: en ese caso di el nombre completo de la zona.</figcaption>
-</figure>
+<h3>Cámaras de un DVR/NVR</h3>
+<p>Aparecen agrupadas bajo el nombre de su grabador ("DVR ..." o "NVR ...") y también tienen su número: lo más fácil es decir <span class="frase">camara 5 ampliar</span>. Si nombras el canal (<span class="frase">dahua canal 2 ampliar</span>) y hay dos grabadores con ese canal, el sistema no adivina: te pide decir el número.</p>
 
 <div id="tabla"></div>
 <div class="etiqueta-seccion"><span class="num">3</span><hr></div>
@@ -183,12 +158,12 @@ footer a{color:var(--accent);}
 
 <table>
   <tr><th>Qué hace</th><th>Qué decir</th></tr>
-  <tr><td>Ver una zona en pantalla completa</td><td><span class="frase">&lt;zona&gt; ampliar</span><span class="frase">&lt;zona&gt; mostrar</span></td></tr>
-  <tr><td>Capturar evidencia (foto firmada)</td><td><span class="frase">&lt;zona&gt; capturar</span><span class="frase">&lt;zona&gt; foto</span></td></tr>
-  <tr><td>Acercar (zoom digital)</td><td><span class="frase">&lt;zona&gt; acercar</span><span class="frase">&lt;zona&gt; zoom</span></td></tr>
-  <tr><td>Alejar</td><td><span class="frase">&lt;zona&gt; alejar</span></td></tr>
-  <tr><td>Quitar el zoom</td><td><span class="frase">&lt;zona&gt; zoom normal</span></td></tr>
-  <tr><td>Ver todas las zonas</td><td><span class="frase">vista general</span> (sin zona)</td></tr>
+  <tr><td>Ver una cámara en pantalla completa</td><td><span class="frase">camara N ampliar</span><span class="frase">camara N mostrar</span></td></tr>
+  <tr><td>Capturar evidencia (foto firmada)</td><td><span class="frase">camara N capturar</span><span class="frase">camara N foto</span></td></tr>
+  <tr><td>Acercar (zoom digital)</td><td><span class="frase">camara N acercar</span><span class="frase">camara N zoom</span></td></tr>
+  <tr><td>Alejar</td><td><span class="frase">camara N alejar</span></td></tr>
+  <tr><td>Quitar el zoom</td><td><span class="frase">camara N quitar zoom</span></td></tr>
+  <tr><td>Ver todas las cámaras</td><td><span class="frase">vista general</span></td></tr>
 </table>
 
 <div id="ptz"></div>
@@ -198,11 +173,11 @@ footer a{color:var(--accent);}
 
 <table>
   <tr><th>Qué hace</th><th>Qué decir</th></tr>
-  <tr><td>Mover la cámara</td><td><span class="frase">&lt;zona&gt; mover izquierda</span><span class="frase">&lt;zona&gt; mover derecha</span><span class="frase">&lt;zona&gt; mover arriba</span><span class="frase">&lt;zona&gt; mover abajo</span></td></tr>
-  <tr><td>Guardar la posición actual como preset (1 al 9)</td><td><span class="frase">&lt;zona&gt; preset N guardar</span></td></tr>
-  <tr><td>Ir a una posición ya guardada</td><td><span class="frase">&lt;zona&gt; preset N</span> (sin decir "guardar")</td></tr>
+  <tr><td>Mover la cámara</td><td><span class="frase">camara N mover izquierda</span><span class="frase">camara N mover derecha</span><span class="frase">camara N mover arriba</span><span class="frase">camara N mover abajo</span></td></tr>
+  <tr><td>Guardar la posición actual como preset (1 al 9)</td><td><span class="frase">camara N preset 1 guardar</span></td></tr>
+  <tr><td>Ir a una posición ya guardada</td><td><span class="frase">camara N preset 1</span> (sin decir "guardar")</td></tr>
 </table>
-<p class="nota">Los presets quedan grabados en la propia cámara, no en la computadora — si cambias de cámara en esa zona, tiene que guardar sus propios presets de nuevo.</p>
+<p class="nota">Los presets quedan grabados en la propia cámara, no en la computadora — si cambias una cámara por otra, hay que guardar sus presets de nuevo.</p>
 
 <div id="resumen"></div>
 <div class="etiqueta-seccion"><span class="num">5</span><hr></div>
@@ -211,14 +186,14 @@ footer a{color:var(--accent);}
 
 <div class="tarjeta-resumen">
   <h3>Ejemplos listos para decir</h3>
-  <div class="fila"><span class="frase" style="margin:0;">patio ampliar</span><span class="accion">pantalla completa de Patio</span></div>
-  <div class="fila"><span class="frase" style="margin:0;">ingreso capturar</span><span class="accion">foto firmada de Ingreso</span></div>
-  <div class="fila"><span class="frase" style="margin:0;">estacionamiento acercar</span><span class="accion">zoom en Estacionamiento</span></div>
-  <div class="fila"><span class="frase" style="margin:0;">canal 3 ampliar</span><span class="accion">atajo para zonas de un DVR/NVR</span></div>
-  <div class="fila"><span class="frase" style="margin:0;">patio mover derecha</span><span class="accion">solo camaras con motor PTZ</span></div>
-  <div class="fila"><span class="frase" style="margin:0;">patio preset 1 guardar</span><span class="accion">guarda la posicion actual</span></div>
-  <div class="fila"><span class="frase" style="margin:0;">patio preset 1</span><span class="accion">va a esa posicion guardada</span></div>
-  <div class="fila"><span class="frase" style="margin:0;">vista general</span><span class="accion">muestra todas las zonas</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">camara 1 ampliar</span><span class="accion">pantalla completa de la camara 1</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">camara 2 capturar</span><span class="accion">foto firmada de la camara 2</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">camara 3 zoom</span><span class="accion">acerca la camara 3</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">ingreso alejar</span><span class="accion">por una palabra unica del nombre</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">camara 2 mover derecha</span><span class="accion">solo camaras con motor PTZ</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">camara 2 preset 1 guardar</span><span class="accion">guarda la posicion actual</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">camara 2 preset 1</span><span class="accion">va a esa posicion guardada</span></div>
+  <div class="fila"><span class="frase" style="margin:0;">vista general</span><span class="accion">muestra todas las camaras</span></div>
 </div>
 
 <div class="nota">El botón <strong>"Ver manual de comandos"</strong> dentro del programa (en el mismo panel del micrófono) muestra esta lista ajustada a las cámaras que tienes agregadas ahora mismo: si ninguna tiene PTZ, esa sección ni aparece.</div>
