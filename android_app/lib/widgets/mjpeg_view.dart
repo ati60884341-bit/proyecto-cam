@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
+import 'eye_loader.dart';
 import 'mjpeg_parser.dart';
 
 /// Reproduce el stream en vivo de una camara (ver api_service.py /stream.mjpg)
@@ -39,13 +42,15 @@ class _MjpegViewState extends State<MjpegView> {
     final client = http.Client();
     _client = client;
     try {
-      final respuesta = await client.send(http.Request('GET', widget.uri)..headers.addAll(widget.headers));
+      final respuesta = await client.send(
+        http.Request('GET', widget.uri)..headers.addAll(widget.headers),
+      );
       if (respuesta.statusCode != 200) {
         final mensaje = respuesta.statusCode == 401
             ? 'Sesion vencida, volve a iniciar sesion.'
             : respuesta.statusCode == 404
-                ? 'Camara no encontrada.'
-                : 'No se pudo conectar (${respuesta.statusCode}).';
+            ? 'Camara no encontrada.'
+            : 'No se pudo conectar (${respuesta.statusCode}).';
         if (mounted) setState(() => _error = mensaje);
         return;
       }
@@ -97,20 +102,30 @@ class _MjpegViewState extends State<MjpegView> {
       return Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          Image.memory(_ultimoCuadro!, gaplessPlayback: true, fit: BoxFit.contain),
+          Image.memory(
+            _ultimoCuadro!,
+            gaplessPlayback: true,
+            fit: BoxFit.contain,
+          ),
           if (_error != null)
             Container(
               width: double.infinity,
               color: const Color(0x99000000),
               padding: const EdgeInsets.all(8),
-              child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
         ],
       );
     }
     if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: Colors.white)));
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.white)),
+      );
     }
-    return const Center(child: CircularProgressIndicator());
+    return const Center(child: EyeLoader());
   }
 }

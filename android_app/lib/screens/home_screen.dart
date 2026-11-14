@@ -1,10 +1,13 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../api_client.dart';
 import '../theme.dart';
 import 'login_screen.dart';
 import 'incidencias_screen.dart';
 import 'live_camera_screen.dart';
+import '../widgets/eye_loader.dart';
 
 /// Pantalla principal: resumen + estado en vivo de cada camara. Se actualiza
 /// sola cada 5 s (sondeo simple - no hay push todavia, ver README del
@@ -22,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Camara> _camaras = [];
   String? _error;
   Timer? _timer;
+  bool _primeraCarga = true;
 
   @override
   void initState() {
@@ -45,10 +49,14 @@ class _HomeScreenState extends State<HomeScreen> {
         _resumen = resumen;
         _camaras = camaras;
         _error = null;
+        _primeraCarga = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = '$e');
+      setState(() {
+        _error = '$e';
+        _primeraCarga = false;
+      });
       if (e.toString().contains('vencio')) _cerrarSesion();
     }
   }
@@ -61,8 +69,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _timer?.cancel();
     await widget.api.cerrarSesion();
     if (!mounted) return;
-    Navigator.of(context)
-        .pushAndRemoveUntil(MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)), (route) => false);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)),
+      (route) => false,
+    );
   }
 
   @override
@@ -77,31 +87,52 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.warning_amber_outlined),
             tooltip: 'Incidencias',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => IncidenciasScreen(api: widget.api))),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => IncidenciasScreen(api: widget.api),
+              ),
+            ),
           ),
           IconButton(icon: const Icon(Icons.logout), onPressed: _cerrarSesion),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _actualizar,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (_error != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(color: AppColors.error.withAlpha(0x33), borderRadius: BorderRadius.circular(8)),
-                child: Text(_error!, style: const TextStyle(color: AppColors.error)),
+      body: _primeraCarga
+          ? const Center(child: EyeLoader())
+          : RefreshIndicator(
+              onRefresh: _actualizar,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (_error != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withAlpha(0x33),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ),
+                  if (resumen != null) _tarjetaResumen(resumen),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Camaras',
+                    style: TextStyle(
+                      color: AppColors.texto,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._camaras.asMap().entries.map(
+                    (entrada) => _filaAnimada(entrada.key, entrada.value),
+                  ),
+                ],
               ),
-            if (resumen != null) _tarjetaResumen(resumen),
-            const SizedBox(height: 20),
-            const Text('Camaras', style: TextStyle(color: AppColors.texto, fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            ..._camaras.asMap().entries.map((entrada) => _filaAnimada(entrada.key, entrada.value)),
-          ],
-        ),
-      ),
+            ),
     );
   }
 
@@ -109,13 +140,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final colorAlarma = r.alarmaSonando ? AppColors.error : AppColors.acento;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.panel, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _dato('${r.camarasEnLinea} de ${r.camarasTotal}', 'camaras en linea'),
           _dato('${r.incidenciasHoy}', 'incidencias hoy'),
-          _dato(r.alarmaSonando ? 'Sonando' : 'Apagada', 'alarma', color: colorAlarma),
+          _dato(
+            r.alarmaSonando ? 'Sonando' : 'Apagada',
+            'alarma',
+            color: colorAlarma,
+          ),
         ],
       ),
     );
@@ -124,8 +162,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _dato(String valor, String etiqueta, {Color color = AppColors.texto}) {
     return Column(
       children: [
-        Text(valor, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
-        Text(etiqueta, style: const TextStyle(color: AppColors.textoMuted, fontSize: 12)),
+        Text(
+          valor,
+          style: TextStyle(
+            color: color,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          etiqueta,
+          style: const TextStyle(color: AppColors.textoMuted, fontSize: 12),
+        ),
       ],
     );
   }
@@ -137,32 +185,52 @@ class _HomeScreenState extends State<HomeScreen> {
       curve: Curves.easeOut,
       builder: (_, v, child) => Opacity(
         opacity: v,
-        child: Transform.translate(offset: Offset(0, (1 - v) * 12), child: child),
+        child: Transform.translate(
+          offset: Offset(0, (1 - v) * 12),
+          child: child,
+        ),
       ),
       child: _filaCamara(c),
     );
   }
 
   Widget _filaCamara(Camara c) {
-    final color = c.enSabotaje ? AppColors.error : (c.enLinea ? AppColors.acento : AppColors.textoMuted);
-    final estado = c.enSabotaje ? 'Posible sabotaje' : (c.enLinea ? 'En linea' : 'Sin senal');
+    final color = c.enSabotaje
+        ? AppColors.error
+        : (c.enLinea ? AppColors.acento : AppColors.textoMuted);
+    final estado = c.enSabotaje
+        ? 'Posible sabotaje'
+        : (c.enLinea ? 'En linea' : 'Sin senal');
     return GestureDetector(
       onTap: () {
         if (!c.enLinea) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Camara sin senal.')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Camara sin senal.')));
           return;
         }
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => LiveCameraScreen(api: widget.api, camara: c)));
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => LiveCameraScreen(api: widget.api, camara: c),
+          ),
+        );
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: AppColors.panel, borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(
+          color: AppColors.panel,
+          borderRadius: BorderRadius.circular(10),
+        ),
         child: Row(
           children: [
             Icon(Icons.circle, size: 10, color: color),
             const SizedBox(width: 12),
-            Expanded(child: Text(c.nombre, style: const TextStyle(color: AppColors.texto))),
+            Expanded(
+              child: Text(
+                c.nombre,
+                style: const TextStyle(color: AppColors.texto),
+              ),
+            ),
             Text(estado, style: TextStyle(color: color, fontSize: 12)),
           ],
         ),

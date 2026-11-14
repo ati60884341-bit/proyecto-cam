@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../api_client.dart';
 import '../theme.dart';
+import '../widgets/eye_loader.dart';
 
 const _colorSeveridad = {
   'Critica': AppColors.error,
@@ -46,20 +48,33 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.fondo,
-      appBar: AppBar(backgroundColor: AppColors.fondo, title: const Text('Incidencias')),
+      appBar: AppBar(
+        backgroundColor: AppColors.fondo,
+        title: const Text('Incidencias'),
+      ),
       body: RefreshIndicator(
         onRefresh: _cargar,
         child: _cargando
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: EyeLoader())
             : _error != null
-                ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.error)))
-                : _incidencias.isEmpty
-                    ? const Center(child: Text('Sin incidencias', style: TextStyle(color: AppColors.textoMuted)))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _incidencias.length,
-                        itemBuilder: (_, i) => _tarjeta(_incidencias[i]),
-                      ),
+            ? Center(
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+              )
+            : _incidencias.isEmpty
+            ? const Center(
+                child: Text(
+                  'Sin incidencias',
+                  style: TextStyle(color: AppColors.textoMuted),
+                ),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _incidencias.length,
+                itemBuilder: (_, i) => _tarjeta(_incidencias[i]),
+              ),
       ),
     );
   }
@@ -69,21 +84,43 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.panel, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(inc.tipo, style: const TextStyle(color: AppColors.texto, fontWeight: FontWeight.bold)),
-              Text(inc.severidad, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(
+                inc.tipo,
+                style: const TextStyle(
+                  color: AppColors.texto,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                inc.severidad,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          Text('${inc.zona} · ${inc.fechaHora}', style: const TextStyle(color: AppColors.textoMuted, fontSize: 12)),
+          Text(
+            '${inc.zona} · ${inc.fechaHora}',
+            style: const TextStyle(color: AppColors.textoMuted, fontSize: 12),
+          ),
           const SizedBox(height: 6),
-          Text(inc.descripcion, style: const TextStyle(color: Color(0xFFcfe9ef))),
+          Text(
+            inc.descripcion,
+            style: const TextStyle(color: Color(0xFFcfe9ef)),
+          ),
         ],
       ),
     );
