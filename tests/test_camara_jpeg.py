@@ -18,3 +18,14 @@ assert isinstance(jpg, bytes) and jpg[:2] == b"\xff\xd8", "debe ser un JPEG vali
 decodificado = cv2.imdecode(np.frombuffer(jpg, np.uint8), cv2.IMREAD_COLOR)
 assert decodificado.shape == (480, 640, 3)
 print("OK: obtener_ultimo_jpeg")
+
+# el celular se quejo de que la imagen se ve oscura: el stream de Android
+# tiene que salir mas claro que el frame crudo, sin tocar el video del
+# escritorio (ese sigue usando el frame tal cual en otros lados)
+hilo._ultimo_frame = np.full((480, 640, 3), 40, np.uint8)
+jpg_oscuro = hilo.obtener_ultimo_jpeg()
+decodificado_oscuro = cv2.imdecode(np.frombuffer(jpg_oscuro, np.uint8), cv2.IMREAD_COLOR)
+assert decodificado_oscuro.mean() > 40 + 10, (
+    f"el stream de Android deberia salir mas claro que el frame crudo (40), dio {decodificado_oscuro.mean():.1f}"
+)
+print("OK: obtener_ultimo_jpeg sale mas claro para Android")

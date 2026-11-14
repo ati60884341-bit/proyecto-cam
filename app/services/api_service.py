@@ -18,7 +18,7 @@ from app.models import incidencia_model, usuario_model
 PUERTO_API = 8765
 ALGORITMO_JWT = "HS256"
 HORAS_VALIDEZ_TOKEN = 12
-INTERVALO_STREAM_SEG = 0.12  # ~8 fps
+INTERVALO_STREAM_SEG = 0.08  # ~12 fps (antes 0.12/~8 fps: se sentia con atraso)
 
 # un secreto nuevo por arranque: los tokens no sobreviven un reinicio de la
 # app, que para un v1 de solo lectura es aceptable (el celular vuelve a

@@ -41,6 +41,8 @@ EXPOSICION_WEBCAM_LENTA = -3
 GANANCIA_WEBCAM_MAXIMA = 80
 BRILLO_OBJETIVO = (110, 190)  # antes (80, 160): se veia muy oscura en ambientes con poca luz
 INTERVALO_AJUSTE_EXPOSICION_SEG = 0.6  # antes 1.5: llega al brillo correcto bastante mas rapido al conectar
+BRILLO_EXTRA_ANDROID_ALPHA = 1.2  # ganancia extra solo para el stream de Android (ver obtener_ultimo_jpeg)
+BRILLO_EXTRA_ANDROID_BETA = 18
 
 
 def _abrir_captura(tipo_conexion, url_conexion):
@@ -565,10 +567,15 @@ class CamaraThread(QThread):
         return frame.copy() if frame is not None else None
 
     def obtener_ultimo_jpeg(self):
-        # el ultimo frame codificado a JPEG, para el streaming de la app de Android
+        # el ultimo frame codificado a JPEG, para el streaming de la app de
+        # Android: se ve en una pantalla chica sin los controles de brillo
+        # del escritorio, asi que se aclara un poco mas ademas del ajuste de
+        # exposicion/ganancia que ya tiene el video (ese sigue igual en el
+        # escritorio - este realce es solo para este metodo)
         frame = self._ultimo_frame
         if frame is None:
             return None
+        frame = cv2.convertScaleAbs(frame, alpha=BRILLO_EXTRA_ANDROID_ALPHA, beta=BRILLO_EXTRA_ANDROID_BETA)
         ok_jpg, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, CALIDAD_JPEG_BUFFER])
         return jpg.tobytes() if ok_jpg else None
 
