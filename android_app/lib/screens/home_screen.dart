@@ -54,9 +54,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _cerrarSesion() async {
+    // cancela el sondeo antes de navegar: si no, con una pantalla (camara en
+    // vivo, incidencias) encima de esta, Inicio seguia vivo debajo y el
+    // sondeo repetia el cierre de sesion cada 5s, borrando el login a medio
+    // escribir una y otra vez
+    _timer?.cancel();
     await widget.api.cerrarSesion();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)));
+    Navigator.of(context)
+        .pushAndRemoveUntil(MaterialPageRoute(builder: (_) => LoginScreen(api: widget.api)), (route) => false);
   }
 
   @override
