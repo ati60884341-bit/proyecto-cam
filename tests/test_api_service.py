@@ -86,6 +86,23 @@ r.close()
 r = requests.get(f"{BASE}/camaras/Zona-Que-No-Existe/stream.mjpg", headers=cabecera, timeout=3)
 assert r.status_code == 404, r.text
 
+# 7b) una camara que siempre entrega el mismo cuadro (sin frames nuevos) no debe
+# reenviarlo una y otra vez: el celular necesita que deje de llegar algo para
+# poder avisar "la camara dejo de responder" en vez de mostrarlo "en vivo" para siempre
+r = requests.get(f"{BASE}/camaras/Cam-Ingreso-01/stream.mjpg", headers=cabecera, stream=True, timeout=(3, 1))
+assert r.status_code == 200, r.text
+recibido = b""
+try:
+    for chunk in r.iter_content(chunk_size=4096):
+        recibido += chunk
+        if recibido.count(b"--cuadro\r\n") >= 2 or len(recibido) > 50000:
+            break
+except requests.exceptions.ConnectionError:
+    pass  # no llego nada mas en 1s: esperado cuando no hay cuadro repetido
+r.close()
+cuadros_recibidos = recibido.count(b"--cuadro\r\n")
+assert cuadros_recibidos <= 1, f"se reenvio el mismo cuadro {cuadros_recibidos} veces"
+
 # 8) login con clave mala
 r = requests.post(f"{BASE}/login", json={"usuario": "admin", "clave": "no-es-esta"}, timeout=5)
 assert r.status_code == 401, r.text

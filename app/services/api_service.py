@@ -81,11 +81,19 @@ def stream_camara(zona: str, authorization: str = Header(default=None)):
         raise HTTPException(status_code=404, detail="Camara no encontrada.")
 
     def generar_cuadros():
+        anterior = None
         while True:
             jpg = hilo.obtener_ultimo_jpeg()
-            if jpg:
+            if jpg and jpg != anterior:
+                anterior = jpg
                 yield (b"--cuadro\r\nContent-Type: image/jpeg\r\nContent-Length: "
                        + str(len(jpg)).encode() + b"\r\n\r\n" + jpg + b"\r\n")
+            else:
+                # sin cuadro nuevo (camara sin senal, o el mismo frame de siempre):
+                # no se reenvia - asi el celular puede notar que dejo de llegar
+                # algo nuevo en vez de ver "en vivo" una imagen vieja para siempre.
+                # Tambien le da pie al servidor para notar que el cliente se fue.
+                yield b""
             time.sleep(INTERVALO_STREAM_SEG)
 
     return StreamingResponse(generar_cuadros(), media_type="multipart/x-mixed-replace; boundary=cuadro")
