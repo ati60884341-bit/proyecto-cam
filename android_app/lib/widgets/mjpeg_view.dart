@@ -27,6 +27,10 @@ class _MjpegViewState extends State<MjpegView> {
   @override
   void initState() {
     super.initState();
+    // arranca una sola vez, no en cada intento de reconexion: si no, cada
+    // reintento (cada 2s) pisaba el plazo y el aviso de "dejo de responder"
+    // nunca llegaba a dispararse mientras la camara jamas mandaba un cuadro
+    _reiniciarTemporizadorInactividad();
     _conectar();
   }
 
