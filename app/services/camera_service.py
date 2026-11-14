@@ -15,7 +15,7 @@ os.environ.setdefault(
 )
 
 import cv2
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from app.config import BUFFER_SEGUNDOS, CAPTURA_FPS, UMBRAL_SABOTAJE, EVIDENCIAS_DIR
 
@@ -39,7 +39,8 @@ EXPOSICION_WEBCAM_RAPIDA = -7
 EXPOSICION_WEBCAM_FLUIDA = -4
 EXPOSICION_WEBCAM_LENTA = -3
 GANANCIA_WEBCAM_MAXIMA = 80
-BRILLO_OBJETIVO = (80, 160)
+BRILLO_OBJETIVO = (110, 190)  # antes (80, 160): se veia muy oscura en ambientes con poca luz
+INTERVALO_AJUSTE_EXPOSICION_SEG = 0.6  # antes 1.5: llega al brillo correcto bastante mas rapido al conectar
 
 
 def _abrir_captura(tipo_conexion, url_conexion):
@@ -248,9 +249,9 @@ class CamaraThread(QThread):
     """Hilo independiente por camara (QThread): captura, deteccion de sabotaje
     y buffer RAM de los ultimos BUFFER_SEGUNDOS ("maquina del tiempo")."""
 
-    frame_listo = pyqtSignal(object)          # numpy array BGR, para pintar en la UI
-    estado_cambiado = pyqtSignal(str)         # "conectada" | "sin_senal" | "sabotaje" | "reconectando"
-    sabotaje_detectado = pyqtSignal(str, str, str)  # zona, ruta_video, ruta_foto
+    frame_listo = Signal(object)          # numpy array BGR, para pintar en la UI
+    estado_cambiado = Signal(str)         # "conectada" | "sin_senal" | "sabotaje" | "reconectando"
+    sabotaje_detectado = Signal(str, str, str)  # zona, ruta_video, ruta_foto
 
     def __init__(self, id_camara, zona, nombre_camara, tipo_conexion, url_conexion, parent=None):
         super().__init__(parent)
@@ -309,17 +310,28 @@ class CamaraThread(QThread):
         self._baseline_bordes = None
         self._lecturas_tapada = 0
         self._aprender_desde = time.time() + self.ESPERA_APRENDER_SEG
+        # si se reconecta con la camara todavia tapada, esto evita que el
+        # aviso de sabotaje quede trabado en "ya avisado" para siempre: sin
+        # esto, el controlador (que si se entera del "sin_senal") apagaba la
+        # sirena creyendo que ya no hay sabotaje, mientras este hilo seguia
+        # pensando que si - y con la linea base recien aprendida, nunca mas
+        # volvia a avisar aunque la camara siguiera tapada
+        self._en_sabotaje = False
 
     def _actualizar_sabotaje(self, frame):
         if time.time() < self._aprender_desde:
             return
-        gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # se achica ANTES de pasar a gris: brillo/bordes no necesitan la
+        # resolucion completa (un frame 1080p a escala completa era ~25x mas
+        # trabajo que a 320x240 para el mismo resultado) y bordes ya se
+        # calculaba sobre esta version chica
+        pequeno = cv2.resize(frame, (320, 240), interpolation=cv2.INTER_AREA)
+        chico = cv2.cvtColor(pequeno, cv2.COLOR_BGR2GRAY)
         # meanStdDev de OpenCV: mismo resultado que numpy mean/std pero ~10x
         # mas rapido (std de numpy tomaba ~12 ms por cuadro y bajaba los fps)
-        media, desv = cv2.meanStdDev(gris)
+        media, desv = cv2.meanStdDev(chico)
         brillo = float(media[0][0])
         desviacion = float(desv[0][0])
-        chico = cv2.resize(gris, (320, 240), interpolation=cv2.INTER_AREA)
         bordes = float((cv2.Canny(cv2.GaussianBlur(chico, (5, 5), 0), 40, 120) > 0).mean() * 100)
 
         if self._baseline_brillo is None:
@@ -446,8 +458,13 @@ class CamaraThread(QThread):
             self._forzar_reconexion = False  # descarta pedidos de reconexion viejos, ya se reconecto
             if self.tipo_conexion == "USB":
                 self._iniciar_exposicion_webcam(captura)
-            if self._baseline_brillo is None:
-                self._iniciar_aprendizaje()  # primera conexion: no tomar de base el cuadro negro inicial
+            # en CUALQUIER (re)conexion, no solo la primera: el primer cuadro
+            # suele venir negro/distorsionado (webcam recien encendida, o
+            # video RTSP recien resincronizado tras un PTZ) y antes solo se
+            # volvia a aprender la escena en la conexion inicial - una
+            # reconexion o un resync post-PTZ comparaban ese cuadro raro
+            # contra la linea base vieja y podian disparar un sabotaje falso
+            self._iniciar_aprendizaje()
 
             self.estado_cambiado.emit("conectada")
             razon = self._transmitir(captura)
@@ -526,7 +543,7 @@ class CamaraThread(QThread):
             if ahora - ultimo_procesado < intervalo:
                 continue
             ultimo_procesado = ahora
-            if not es_rtsp and ahora - ultimo_ajuste_exposicion > 1.5:
+            if not es_rtsp and ahora - ultimo_ajuste_exposicion > INTERVALO_AJUSTE_EXPOSICION_SEG:
                 ultimo_ajuste_exposicion = ahora
                 self._ajustar_exposicion_webcam(captura, frame)
 
@@ -547,6 +564,14 @@ class CamaraThread(QThread):
         frame = self._ultimo_frame
         return frame.copy() if frame is not None else None
 
+    def obtener_ultimo_jpeg(self):
+        # el ultimo frame codificado a JPEG, para el streaming de la app de Android
+        frame = self._ultimo_frame
+        if frame is None:
+            return None
+        ok_jpg, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, CALIDAD_JPEG_BUFFER])
+        return jpg.tobytes() if ok_jpg else None
+
 
 class DeteccionCamarasUSBThread(QThread):
     """Prueba los indices 0..4 de camara USB/integrada: cual es la webcam
@@ -555,7 +580,7 @@ class DeteccionCamarasUSBThread(QThread):
     instalador que adivine, se prueban todos y se devuelven los que
     respondieron con imagen real."""
 
-    resultado = pyqtSignal(list)  # [{"indice": int, "resolucion": "WxH"}, ...]
+    resultado = Signal(list)  # [{"indice": int, "resolucion": "WxH"}, ...]
 
     def run(self):
         encontradas = []
@@ -577,7 +602,7 @@ class PruebaConexionThread(QThread):
     el stream nunca entregue nada). Corre en su propio hilo para no congelar
     la UI mientras FFmpeg intenta conectar."""
 
-    resultado = pyqtSignal(bool, str)
+    resultado = Signal(bool, str)
 
     def __init__(self, tipo_conexion, url_conexion, parent=None):
         super().__init__(parent)
@@ -626,9 +651,9 @@ class DeteccionCanalesDVRThread(QThread):
     (IP, usuario, clave, cantidad de canales) y esto devuelve cuales canales
     respondieron con imagen real, listos para darse de alta todos juntos."""
 
-    progreso = pyqtSignal(int, int)  # canal_actual, total
-    resultado = pyqtSignal(list)  # [{"canal": int, "url": str, "resolucion": "WxH"}, ...]
-    diagnostico = pyqtSignal(str)  # detalle de red cuando resultado sale vacio (ver _diagnostico_red)
+    progreso = Signal(int, int)  # canal_actual, total
+    resultado = Signal(list)  # [{"canal": int, "url": str, "resolucion": "WxH"}, ...]
+    diagnostico = Signal(str)  # detalle de red cuando resultado sale vacio (ver _diagnostico_red)
 
     def __init__(self, marca, ip, puerto, usuario, clave, cantidad_canales, canales_a_omitir=None, parent=None):
         super().__init__(parent)
