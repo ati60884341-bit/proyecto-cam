@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../widgets/gif_background.dart';
 
 /// Pantalla que se ve al abrir la app: el ojo aparece con un pop suave
 /// mientras se carga la sesion guardada (ver main.dart / _ArranqueState).
@@ -25,17 +26,22 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.fondo,
-      body: Center(
-        child: AnimatedScale(
-          scale: _visible ? 1.0 : 0.85,
-          duration: const Duration(milliseconds: 900),
-          curve: Curves.easeOutBack,
-          child: AnimatedOpacity(
-            opacity: _visible ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 700),
-            child: Image.asset('assets/icono_ojo.png', width: 140),
+      body: Stack(
+        children: [
+          const GifBackground(opacidadOscuro: 0.6),
+          Center(
+            child: AnimatedScale(
+              scale: _visible ? 1.0 : 0.85,
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeOutBack,
+              child: AnimatedOpacity(
+                opacity: _visible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 700),
+                child: Image.asset('assets/icono_ojo.png', width: 140),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
