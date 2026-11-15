@@ -35,6 +35,9 @@ class _VoiceButtonState extends State<VoiceButton> {
 
   _EstadoVoz _estado = _EstadoVoz.reposo;
   double _shakeOffset = 0;
+  // true mientras el dedo sigue presionado; permite detectar que se soltó
+  // mientras _asegurarInicializado() seguía pendiente (ver _empezarAEscuchar).
+  bool _presionando = false;
 
   Future<void> _asegurarInicializado() async {
     if (_speechListo || _initializando) return;
@@ -58,12 +61,17 @@ class _VoiceButtonState extends State<VoiceButton> {
   }
 
   Future<void> _empezarAEscuchar() async {
+    _presionando = true;
     await _asegurarInicializado();
+    if (!mounted) return;
     if (!_speechListo) {
-      if (!mounted) return;
       _mostrarNoEntendido();
       return;
     }
+    // si ya soltó el dedo mientras esperábamos la inicialización, no
+    // arrancamos el micrófono: no hay nada que lo pare hasta la próxima
+    // vez que presionen.
+    if (!_presionando) return;
     setState(() => _estado = _EstadoVoz.escuchando);
     await _speech.listen(onResult: (result) {
       if (!result.finalResult) return;
@@ -72,6 +80,7 @@ class _VoiceButtonState extends State<VoiceButton> {
   }
 
   Future<void> _soltar() async {
+    _presionando = false;
     if (_estado != _EstadoVoz.escuchando) return;
     setState(() => _estado = _EstadoVoz.procesando);
     await _speech.stop();
