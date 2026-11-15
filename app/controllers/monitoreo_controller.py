@@ -2,8 +2,8 @@ import os
 import threading
 import time
 
-from PyQt6.QtCore import QTimer, QObject, QSettings, pyqtSignal
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QTimer, QThread, QObject, QSettings, Signal
+from PySide6.QtWidgets import QApplication
 
 from app.config import EVIDENCIAS_DIR
 from app.models import incidencia_model, evidencia_model, fatiga_model, comando_model, dispositivo_dvr_model
@@ -20,11 +20,72 @@ from app.views.UI.zona_ampliada_dialog import ZonaAmpliadaDialog
 import cv2
 
 
+class _ConsultaDispositivosThread(QThread):
+    """Trae los datos de cada DVR/NVR desde la base en un hilo aparte: antes
+    se consultaba en el hilo de la UI al abrir sesion (un viaje a la base
+    por cada grabador), lo que trababa la ventana un instante justo al
+    entrar. Solo lee - la consulta de red a cada equipo sigue siendo
+    responsabilidad de IdentificarGrabadoresThread."""
+    listos = Signal(list)
+
+    def __init__(self, ids, parent=None):
+        super().__init__(parent)
+        self._ids = ids
+
+    def run(self):
+        self.listos.emit(dispositivo_dvr_model.obtener_varios(self._ids))
+
+
+class _GuardarEvidenciaSabotajeThread(QThread):
+    """El INSERT de la incidencia, el hash SHA-256 de foto+video y los
+    INSERT de evidencia corrian en el slot de la senal sabotaje_detectado,
+    es decir en el hilo de la UI: mientras duraban, las demas camaras se
+    quedaban sin pintar su siguiente cuadro. Esto hace ese trabajo aca y
+    devuelve lo que la UI necesita (mensaje de registro, foto+hash para la
+    alerta al celular) por senal."""
+    listo = Signal(str, str, object)  # zona, mensaje_evento, (ruta_foto, hash_foto) o None
+
+    def __init__(self, zona, camara_info, ruta_video, ruta_foto, id_usuario, id_turno,
+                 tipo="Sabotaje", severidad="Alta", parent=None):
+        super().__init__(parent)
+        self._zona = zona
+        self._camara_info = camara_info
+        self._ruta_video = ruta_video
+        self._ruta_foto = ruta_foto
+        self._id_usuario = id_usuario
+        self._id_turno = id_turno
+        self._tipo = tipo
+        self._severidad = severidad
+
+    def run(self):
+        camara_info = self._camara_info
+        id_incidencia = incidencia_model.crear(
+            camara_info["IdZona"], self._tipo,
+            "Camara tapada/movida - deteccion automatica (buffer de 8s exportado)",
+            id_camara=camara_info["IdCamara"], id_turno=self._id_turno, severidad=self._severidad,
+        )
+        hash_foto = None
+        for ruta, tipo in [(self._ruta_foto, "Foto"), (self._ruta_video, "Video")]:
+            if os.path.exists(ruta):
+                hash_archivo = firmar_archivo(ruta)
+                if tipo == "Foto":
+                    hash_foto = hash_archivo
+                evidencia_model.crear(
+                    camara_info["IdZona"], ruta, tipo, hash_archivo,
+                    id_usuario=self._id_usuario, id_incidencia=id_incidencia,
+                )
+        mensaje = (
+            f"[EVIDENCIA] Sabotaje en {self._zona}: foto y video (8s previos) firmados con SHA-256 y guardados."
+        )
+        datos_alerta = (self._ruta_foto, hash_foto) if (os.path.exists(self._ruta_foto) and hash_foto) else None
+        self.listo.emit(self._zona, mensaje, datos_alerta)
+
+
 class _PuenteAlertas(QObject):
     """alertas_service envia desde un hilo Python comun (no QThread); una
     senal Qt es la forma segura de volver al hilo de la UI para actualizar
     la bitacora sin tocar widgets desde otro hilo."""
-    resultado = pyqtSignal(bool, str)
+    resultado = Signal(bool, str)
 
 
 class MonitoreoController:
@@ -199,6 +260,21 @@ class MonitoreoController:
         en_linea = sum(1 for k in visibles if self._estados.get(k) in ("conectada", "reconectando"))
         return en_linea, len(visibles)
 
+    def estado_camaras(self):
+        """Estado en vivo de cada camara no oculta - lo unico que sabe esto
+        es esta instancia (no esta en la base): lo usa la API para la app
+        de Android, igual que el resumen de Inicio."""
+        return [
+            {
+                "zona": zona,
+                "nombre": camara["Nombre"],
+                "en_linea": self._estados.get(zona) in ("conectada", "reconectando"),
+                "en_sabotaje": zona in self._zonas_en_sabotaje,
+            }
+            for zona, camara in self.camaras_por_zona.items()
+            if zona not in self._zonas_ocultas
+        ]
+
     def _clave_panico(self):
         """El gesto de panico se mira en la webcam de la PC (la que tiene
         delante el vigilante): la primera camara USB registrada."""
@@ -289,6 +365,11 @@ class MonitoreoController:
         zona = next((k for k, c in self.camaras_por_zona.items() if c["IdCamara"] == id_camara), None)
         if zona is None:
             return
+        if zona == self._clave_panico() and self.view.chk_gesto.isChecked():
+            # era la webcam del panico silencioso: apagar la deteccion de
+            # gesto en vez de dejarla "activa" para siempre sin camara que
+            # mirar (el checkbox se desincronizaria del estado real)
+            self.view.chk_gesto.setChecked(False)
         hilo = self.hilos_camara.pop(zona, None)
         if hilo:
             self._retirar_hilo(hilo)
@@ -374,7 +455,16 @@ class MonitoreoController:
         su grupo como DVR o NVR (ej. 'NVR "angel" — Dahua · DHI-NVR1108HS').
         Si no responde, el grupo queda como 'Grabador'."""
         ids = set(ids) if ids else {c["IdDispositivo"] for c in self.camaras_por_zona.values() if c.get("IdDispositivo")}
-        dispositivos = [d for d in (dispositivo_dvr_model.obtener(i) for i in ids) if d]
+        if not ids:
+            return
+        hilos = self.__dict__.setdefault("_hilos_identificacion", [])
+        consulta = _ConsultaDispositivosThread(ids)
+        consulta.listos.connect(self._iniciar_identificacion_grabadores)
+        consulta.finished.connect(lambda h=consulta: h in hilos and hilos.remove(h))
+        hilos.append(consulta)
+        consulta.start()
+
+    def _iniciar_identificacion_grabadores(self, dispositivos):
         if not dispositivos:
             return
         hilos = self.__dict__.setdefault("_hilos_identificacion", [])
@@ -479,46 +569,56 @@ class MonitoreoController:
         self.view.registrar_evento(f"[ALARMA] Sirena apagada ({motivo}).")
 
     # ---------------- sabotaje automatico ----------------
-    def _on_sabotaje(self, zona, ruta_video, ruta_foto):
+    def _on_sabotaje(self, zona, ruta_video, ruta_foto, es_simulacro=False):
         camara_info = self.camaras_por_zona.get(zona)
         if not camara_info:
             return
-
-        id_incidencia = incidencia_model.crear(
-            camara_info["IdZona"], "Sabotaje",
-            "Camara tapada/movida - deteccion automatica (buffer de 8s exportado)",
-            id_camara=camara_info["IdCamara"],
-            id_turno=self.obtener_turno_actual(),
-            severidad="Alta",
+        # el hash SHA-256 y los INSERT a la base van en un hilo aparte: hacerlo
+        # aca mismo (hilo de la UI) trababa el video de TODAS las camaras
+        # mientras duraba (ver _GuardarEvidenciaSabotajeThread)
+        hilos = self.__dict__.setdefault("_hilos_evidencia", [])
+        hilo = _GuardarEvidenciaSabotajeThread(
+            zona, camara_info, ruta_video, ruta_foto,
+            self.usuario["IdUsuario"], self.obtener_turno_actual(),
+            tipo="Simulacro" if es_simulacro else "Sabotaje",
+            severidad="Normal" if es_simulacro else "Alta",
         )
-
-        hash_foto = None
-        for ruta, tipo in [(ruta_foto, "Foto"), (ruta_video, "Video")]:
-            if os.path.exists(ruta):
-                hash_archivo = firmar_archivo(ruta)
-                if tipo == "Foto":
-                    hash_foto = hash_archivo
-                evidencia_model.crear(
-                    camara_info["IdZona"], ruta, tipo, hash_archivo,
-                    id_usuario=self.usuario["IdUsuario"], id_incidencia=id_incidencia,
-                )
-
-        self.view.registrar_evento(
-            f"[EVIDENCIA] Sabotaje en {zona}: foto y video (8s previos) firmados con SHA-256 y guardados."
-        )
+        hilo.listo.connect(self._evidencia_sabotaje_lista)
+        hilo.finished.connect(lambda h=hilo: h in hilos and hilos.remove(h))
+        hilos.append(hilo)
+        hilo.start()
         # (el sonido ya lo da la sirena, que arranca en _on_estado apenas se
         # detecta, sin esperar a que se exporte la evidencia)
 
-        if os.path.exists(ruta_foto) and hash_foto:
-            alertas_service.enviar_alerta_async(
-                ruta_foto,
-                f"🚨 ALERTA: camara tapada o movida\n"
-                f"Camara: {zona}\n"
-                f"Hora: {time.strftime('%d/%m/%Y %H:%M:%S')}\n"
-                f"Foto: {SEGUNDOS_FOTO_ANTES} segundos antes del sabotaje\n"
-                f"Firma SHA-256: {hash_foto}",
-                al_terminar=self._puente_alertas.resultado.emit,
-            )
+    def disparar_simulacro(self, zona):
+        """Dispara un simulacro de sabotaje en una zona ya conectada (para la
+        demo): reutiliza el mismo pipeline de evidencia que el sabotaje real,
+        marcado como Tipo="Simulacro"/Severidad="Normal". Deliberadamente NO
+        agrega la zona a self._zonas_en_sabotaje: ese set solo se limpia
+        cuando la camara "se destapa" de verdad, y una zona simulada nunca
+        pasa por ese camino - el costo aceptado es que el resumen de la
+        alarma no lista esta zona por nombre."""
+        hilo = self.hilos_camara.get(zona)
+        if hilo is None:
+            return False
+        self._activar_alarma()
+        hilo.disparar_simulacro()
+        return True
+
+    def _evidencia_sabotaje_lista(self, zona, mensaje, datos_alerta):
+        self.view.registrar_evento(mensaje)
+        if datos_alerta is None:
+            return
+        ruta_foto, hash_foto = datos_alerta
+        alertas_service.enviar_alerta_async(
+            ruta_foto,
+            f"🚨 ALERTA: camara tapada o movida\n"
+            f"Camara: {zona}\n"
+            f"Hora: {time.strftime('%d/%m/%Y %H:%M:%S')}\n"
+            f"Foto: {SEGUNDOS_FOTO_ANTES} segundos antes del sabotaje\n"
+            f"Firma SHA-256: {hash_foto}",
+            al_terminar=self._puente_alertas.resultado.emit,
+        )
 
     # ---------------- captura manual de evidencia ----------------
     def capturar_evidencia(self, zona):
