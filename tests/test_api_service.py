@@ -29,9 +29,14 @@ class _HiloFalso:
         return [jpg, jpg, jpg]
 
 
+class _HiloSinBuffer:
+    def obtener_buffer_jpeg_brillante(self):
+        return []  # camara recien conectada, todavia sin cuadros en el buffer
+
+
 class _MonitoreoFalso:
     _alarma_sonando = False
-    hilos_camara = {"Cam-Ingreso-01": _HiloFalso()}
+    hilos_camara = {"Cam-Ingreso-01": _HiloFalso(), "Cam-Sin-Buffer": _HiloSinBuffer()}
 
     def estado_camaras(self):
         return [{"zona": "Cam-Ingreso-01", "nombre": "Cam-Ingreso-01", "en_linea": True, "en_sabotaje": False}]
@@ -111,6 +116,11 @@ assert cuadros_recibidos <= 1, f"se reenvio el mismo cuadro {cuadros_recibidos} 
 r = requests.get(f"{BASE}/camaras/Cam-Ingreso-01/rewind.mjpg", headers=cabecera, timeout=5)
 assert r.status_code == 200, r.text
 assert r.content.count(b"--cuadro\r\n") == 3, r.content.count(b"--cuadro\r\n")
+
+# 7c-bis) rebobinado con buffer vacio: responde 200 y termina sola sin cuadros
+r = requests.get(f"{BASE}/camaras/Cam-Sin-Buffer/rewind.mjpg", headers=cabecera, timeout=3)
+assert r.status_code == 200, r.text
+assert r.content.count(b"--cuadro\r\n") == 0, r.content
 
 # 7d) rebobinado de una camara que no existe
 r = requests.get(f"{BASE}/camaras/Zona-Que-No-Existe/rewind.mjpg", headers=cabecera, timeout=3)
