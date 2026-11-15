@@ -141,10 +141,11 @@ class _SimulacroScreenState extends State<SimulacroScreen> {
     // la confirmación del otro.
     final futuroEvidencia = _sondear(() async {
       final incidencias = await widget.api.getIncidencias(limite: 5);
+      // sin comparar zona: la incidencia trae el NOMBRE de la zona y
+      // widget.zona es la clave de la camara, nunca coinciden. Alcanza con
+      // tipo Simulacro + que no estuviera en la foto de "antes".
       return incidencias.any((i) =>
-          i.tipo == 'Simulacro' &&
-          i.zona == widget.zona &&
-          !firmasAntes.contains(_firma(i)));
+          i.tipo == 'Simulacro' && !firmasAntes.contains(_firma(i)));
     });
     final futuroAlarma = _sondear(() async {
       final resumen = await widget.api.getResumen();

@@ -80,6 +80,8 @@ class _MjpegViewState extends State<MjpegView> {
         onError: (_) => _reintentar(),
         onDone: () {
           if (widget.finito) {
+            // el rebobinado termino a proposito: no avisar "dejo de responder"
+            _temporizadorInactividad?.cancel();
             if (mounted) widget.onTerminado?.call();
             return;
           }
