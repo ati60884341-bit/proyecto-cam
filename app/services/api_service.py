@@ -117,6 +117,16 @@ def rewind_camara(zona: str, authorization: str = Header(default=None)):
     return StreamingResponse(generar_repeticion(), media_type="multipart/x-mixed-replace; boundary=cuadro")
 
 
+@app.post("/camaras/{zona}/simular-incidente")
+def simular_incidente(zona: str, authorization: str = Header(default=None)):
+    _validar_token(authorization)
+    if _monitoreo_controller is None:
+        raise HTTPException(status_code=503, detail="El Centro de Monitoreo todavia no arranco.")
+    if not _monitoreo_controller.disparar_simulacro(zona):
+        raise HTTPException(status_code=404, detail="Camara no encontrada.")
+    return {"disparado": True}
+
+
 @app.get("/incidencias")
 def incidencias(limite: int = 20, authorization: str = Header(default=None)):
     _validar_token(authorization)

@@ -44,6 +44,9 @@ class _MonitoreoFalso:
     def resumen_camaras(self):
         return 1, 3
 
+    def disparar_simulacro(self, zona):
+        return zona in self.hilos_camara
+
 
 api_service.iniciar_api(_MonitoreoFalso(), puerto=PUERTO)
 
@@ -124,6 +127,13 @@ assert r.content.count(b"--cuadro\r\n") == 0, r.content
 
 # 7d) rebobinado de una camara que no existe
 r = requests.get(f"{BASE}/camaras/Zona-Que-No-Existe/rewind.mjpg", headers=cabecera, timeout=3)
+assert r.status_code == 404, r.text
+
+# 7e) simular incidente en una camara existente y en una que no existe
+r = requests.post(f"{BASE}/camaras/Cam-Ingreso-01/simular-incidente", headers=cabecera, timeout=3)
+assert r.status_code == 200 and r.json() == {"disparado": True}, r.text
+
+r = requests.post(f"{BASE}/camaras/Zona-Que-No-Existe/simular-incidente", headers=cabecera, timeout=3)
 assert r.status_code == 404, r.text
 
 # 8) login con clave mala
