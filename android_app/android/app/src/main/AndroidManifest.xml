@@ -3,6 +3,7 @@
          red local (no https): hace falta permiso de red y permitir trafico
          sin cifrar, si no Android bloquea todas las llamadas -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
         android:label="CAM"
         android:name="${applicationName}"
