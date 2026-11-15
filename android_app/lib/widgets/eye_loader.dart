@@ -32,7 +32,11 @@ class _EyeLoaderState extends State<EyeLoader> {
       duration: const Duration(milliseconds: 900),
       curve: Curves.easeInOut,
       onEnd: _alternar,
-      child: Image.asset('assets/icono_ojo.png', width: widget.tamano, height: widget.tamano),
+      child: Image.asset(
+        'assets/icono_ojo.png',
+        width: widget.tamano,
+        height: widget.tamano,
+      ),
     );
   }
 }

@@ -14,7 +14,11 @@ class GifBackground extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/fondo_nocturno.gif', fit: BoxFit.cover, gaplessPlayback: true),
+          Image.asset(
+            'assets/fondo_nocturno.gif',
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+          ),
           Container(color: Colors.black.withValues(alpha: opacidadOscuro)),
         ],
       ),
