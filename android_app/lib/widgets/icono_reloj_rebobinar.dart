@@ -57,7 +57,8 @@ class _RelojRebobinarPainter extends CustomPainter {
     );
 
     // Manecilla larga hacia las 4 (abajo-derecha).
-    final anguloManecillaLarga = _gradosARadianes(60); // 0°=3h, sentido horario
+    // Convención: 0° = posición de las 3, 90° = posición de las 6.
+    final anguloManecillaLarga = _gradosARadianes(30); // las 4 = 1/3 de 3 a 6
     canvas.drawLine(
       centro,
       Offset(
