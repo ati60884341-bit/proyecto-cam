@@ -135,4 +135,18 @@ class ApiClient {
       _get('/incidencias?limite=$limite', (j) => (j as List).map((e) => Incidencia.fromJson(e)).toList());
 
   Future<Resumen> getResumen() => _get('/resumen', (j) => Resumen.fromJson(j));
+
+  /// Dispara un incidente simulado en [zona] (botón/voz de demo, ver
+  /// `SimulacroScreen`). Misma validación de 401/errores que `_get`.
+  Future<void> simularIncidente(String zona) async {
+    final respuesta = await http
+        .post(_uri('/camaras/$zona/simular-incidente'), headers: _cabeceras)
+        .timeout(const Duration(seconds: 8));
+    if (respuesta.statusCode == 401) {
+      throw Exception('La sesion vencio, inicie sesion de nuevo.');
+    }
+    if (respuesta.statusCode != 200) {
+      throw Exception('Error del servidor (${respuesta.statusCode}).');
+    }
+  }
 }

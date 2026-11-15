@@ -8,7 +8,9 @@ import '../voice_commands.dart';
 import 'login_screen.dart';
 import 'incidencias_screen.dart';
 import 'live_camera_screen.dart';
+import 'simulacro_screen.dart';
 import '../widgets/eye_loader.dart';
+import '../widgets/icono_alarma.dart';
 import '../widgets/voice_button.dart';
 
 /// Pantalla principal: resumen + estado en vivo de cada camara. Se actualiza
@@ -98,15 +100,35 @@ class _HomeScreenState extends State<HomeScreen> {
       case IrAInicio():
         Navigator.of(context).popUntil((route) => route.isFirst);
       case SimularIncidenteVoz():
-        // TODO(Tarea 16): navegar a SimulacroScreen una vez que exista
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Función de simulación disponible próximamente.'),
-          ),
-        );
+        _irASimulacro();
       case CerrarSesionVoz():
         _cerrarSesion();
     }
+  }
+
+  /// Elige la primer cámara en línea para simular un incidente ahí (no tiene
+  /// sentido simular sabotaje en una cámara sin buffer en vivo) y navega a
+  /// [SimulacroScreen]. Usado tanto por el botón de la AppBar como por el
+  /// comando de voz "simular incidente" (ver [_onComandoVoz]).
+  void _irASimulacro() {
+    Camara? elegida;
+    for (final c in _camaras) {
+      if (c.enLinea) {
+        elegida = c;
+        break;
+      }
+    }
+    if (elegida == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay camaras en linea para simular.')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SimulacroScreen(api: widget.api, zona: elegida!.zona),
+      ),
+    );
   }
 
   @override
@@ -127,6 +149,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (_) => IncidenciasScreen(api: widget.api),
               ),
             ),
+          ),
+          IconButton(
+            icon: const IconoAlarma(tamano: 24),
+            tooltip: 'Simular incidente',
+            onPressed: _irASimulacro,
           ),
           IconButton(icon: const Icon(Icons.logout), onPressed: _cerrarSesion),
         ],
