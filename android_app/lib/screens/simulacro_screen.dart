@@ -20,9 +20,15 @@ class SimulacroScreen extends StatefulWidget {
   State<SimulacroScreen> createState() => _SimulacroScreenState();
 }
 
-class _SimulacroScreenState extends State<SimulacroScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _anillo;
+class _SimulacroScreenState extends State<SimulacroScreen> {
+  // Anillo de "mantené presionado": animación implícita (sin
+  // AnimationController propio). `_anilloTarget` es 0 o 1 y
+  // TweenAnimationBuilder anima hacia ese valor con `_anilloDuration`;
+  // `onEnd` dispara `_armar` solo si, cuando la animación termina, el
+  // target sigue siendo 1 (no se soltó antes) y todavía no se armó.
+  double _anilloTarget = 0;
+  Duration _anilloDuration = const Duration(milliseconds: 1500);
+  bool _armando = false;
   bool _enviando = false;
   bool _confirmando = false;
   double _opacidadDestello = 0;
@@ -31,34 +37,32 @@ class _SimulacroScreenState extends State<SimulacroScreen>
   _EstadoPaso _paso2 = _EstadoPaso.pendiente;
   _EstadoPaso _paso3 = _EstadoPaso.pendiente;
 
-  @override
-  void initState() {
-    super.initState();
-    _anillo = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..addStatusListener((estado) {
-        if (estado == AnimationStatus.completed) _armar();
-      });
-  }
-
-  @override
-  void dispose() {
-    _anillo.dispose();
-    super.dispose();
-  }
-
   void _onPressStart() {
     if (_enviando || _confirmando) return;
-    _anillo.forward(from: 0);
+    setState(() {
+      _armando = false;
+      _anilloTarget = 1;
+      _anilloDuration = const Duration(milliseconds: 1500);
+    });
   }
 
-  /// Soltar antes de llegar al final de los 1.5s retrocede el anillo y no
-  /// dispara nada. Si ya completó (el listener de `_anillo` ya llamó a
-  /// `_armar`), no hay nada que retroceder.
+  /// Soltar antes de llegar al final de los 1.5s manda el anillo de vuelta
+  /// a 0 en 200ms y, como `_anilloTarget` ya no es 1, el `onEnd` de esa
+  /// nueva animación no dispara `_armar`. Si ya se armó (`_armando` ya es
+  /// true), no hay nada que retroceder.
   void _onPressEndOCancel() {
-    if (_anillo.status == AnimationStatus.forward) {
-      _anillo.animateTo(0, duration: const Duration(milliseconds: 200));
+    if (_anilloTarget == 1 && !_armando) {
+      setState(() {
+        _anilloTarget = 0;
+        _anilloDuration = const Duration(milliseconds: 200);
+      });
+    }
+  }
+
+  void _onAnilloEnd() {
+    if (_anilloTarget == 1 && !_armando) {
+      _armando = true;
+      _armar();
     }
   }
 
@@ -82,8 +86,11 @@ class _SimulacroScreenState extends State<SimulacroScreen>
       await widget.api.simularIncidente(widget.zona);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _enviando = false);
-      _anillo.value = 0;
+      setState(() {
+        _enviando = false;
+        _anilloTarget = 0;
+        _anilloDuration = const Duration(milliseconds: 200);
+      });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       return;
     }
@@ -128,22 +135,29 @@ class _SimulacroScreenState extends State<SimulacroScreen>
   Future<void> _confirmarPasos(List<Incidencia> antes) async {
     final firmasAntes = antes.map(_firma).toSet();
 
-    final evidenciaOk = await _sondear(() async {
+    // Los pasos 2 y 3 sondean estados independientes del backend (la
+    // evidencia escrita vs. la alarma sonando), así que arrancan los dos
+    // sondeos antes de esperar a cualquiera: si uno es lento no retrasa
+    // la confirmación del otro.
+    final futuroEvidencia = _sondear(() async {
       final incidencias = await widget.api.getIncidencias(limite: 5);
       return incidencias.any((i) =>
           i.tipo == 'Simulacro' &&
           i.zona == widget.zona &&
           !firmasAntes.contains(_firma(i)));
     });
+    final futuroAlarma = _sondear(() async {
+      final resumen = await widget.api.getResumen();
+      return resumen.alarmaSonando;
+    });
+
+    final evidenciaOk = await futuroEvidencia;
     if (!mounted) return;
     setState(() {
       _paso2 = evidenciaOk ? _EstadoPaso.confirmado : _EstadoPaso.expirado;
     });
 
-    final alarmaOk = await _sondear(() async {
-      final resumen = await widget.api.getResumen();
-      return resumen.alarmaSonando;
-    });
+    final alarmaOk = await futuroAlarma;
     if (!mounted) return;
     setState(() {
       _paso3 = alarmaOk ? _EstadoPaso.confirmado : _EstadoPaso.expirado;
@@ -186,9 +200,11 @@ class _SimulacroScreenState extends State<SimulacroScreen>
           onLongPressStart: (_) => _onPressStart(),
           onLongPressEnd: (_) => _onPressEndOCancel(),
           onLongPressCancel: _onPressEndOCancel,
-          child: AnimatedBuilder(
-            animation: _anillo,
-            builder: (_, _) => SizedBox(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: _anilloTarget),
+            duration: _anilloDuration,
+            onEnd: _onAnilloEnd,
+            builder: (_, valor, _) => SizedBox(
               width: 140,
               height: 140,
               child: Stack(
@@ -198,7 +214,7 @@ class _SimulacroScreenState extends State<SimulacroScreen>
                     width: 140,
                     height: 140,
                     child: CircularProgressIndicator(
-                      value: _anillo.value,
+                      value: valor,
                       strokeWidth: 6,
                       color: AppColors.error,
                       backgroundColor: AppColors.borde,
