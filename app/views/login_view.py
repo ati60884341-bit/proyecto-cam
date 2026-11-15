@@ -1,5 +1,5 @@
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFrame, QLineEdit, QPushButton, QLabel, QMessageBox,
 )
 
@@ -29,7 +29,7 @@ QPushButton#btnIngresar:hover { background: #4fe4d8; }
 
 
 class LoginView(QWidget):
-    intento_login = pyqtSignal(str, str)  # usuario, clave
+    intento_login = Signal(str, str)  # usuario, clave
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -83,6 +83,16 @@ class LoginView(QWidget):
         layout_tarjeta.addWidget(self.campo_clave)
         layout_tarjeta.addSpacing(16)
 
+        etiqueta_qr = QLabel("Escaneá con la app CAM")
+        etiqueta_qr.setObjectName("ayudaLogin")
+        etiqueta_qr.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout_tarjeta.addWidget(etiqueta_qr)
+        self.lbl_qr = QLabel()
+        self.lbl_qr.setFixedSize(110, 110)
+        self.lbl_qr.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout_tarjeta.addWidget(self.lbl_qr, alignment=Qt.AlignmentFlag.AlignHCenter)
+        layout_tarjeta.addSpacing(16)
+
         self.btn_ingresar = QPushButton("Ingresar")
         self.btn_ingresar.setObjectName("btnIngresar")
         self.btn_ingresar.clicked.connect(self._emitir_login)
@@ -107,3 +117,9 @@ class LoginView(QWidget):
 
     def mostrar_error(self, mensaje):
         QMessageBox.warning(self, "No se pudo iniciar sesion", mensaje)
+
+    def set_codigo_qr(self, png_bytes):
+        from PySide6.QtGui import QPixmap
+        pixmap = QPixmap()
+        pixmap.loadFromData(png_bytes)
+        self.lbl_qr.setPixmap(pixmap.scaled(110, 110))

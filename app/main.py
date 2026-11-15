@@ -4,8 +4,10 @@ import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QMessageBox
 
+from app.config import IMAGENES_DIR
 from app.views.login_view import LoginView
 from app.views.UI.splash_view import SplashView
 from app.views.UI.tema import hoja_estilos_global, aplicar_paleta_oscura
@@ -37,6 +39,9 @@ def _instalar_manejador_errores(app):
 def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    # icono de la app (ventana, taskbar): antes no tenia ninguno seteado y
+    # Windows mostraba el panel blanco generico
+    app.setWindowIcon(QIcon(os.path.join(IMAGENES_DIR, "icono_cam.ico")))
     # paleta oscura DE VERDAD (QPalette, no solo QSS) + hoja de estilos:
     # entre las dos cubren tanto los controles especificos (botones, campos,
     # tablas) como los widgets "en blanco" (QWidget simple, QStackedWidget)
@@ -53,6 +58,11 @@ def main():
     _instalar_manejador_errores(app)
 
     login_view = LoginView()
+    try:
+        from app.services import qr_service
+        login_view.set_codigo_qr(qr_service.generar_qr_png_bytes(qr_service.detectar_ip_lan()))
+    except Exception:
+        pass
     auth_controller = AuthController(login_view)
 
     def al_salir():
