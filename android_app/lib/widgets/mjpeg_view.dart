@@ -13,7 +13,19 @@ import 'mjpeg_parser.dart';
 class MjpegView extends StatefulWidget {
   final Uri uri;
   final Map<String, String> headers;
-  const MjpegView({super.key, required this.uri, required this.headers});
+  /// Si es true, cuando el stream termina (onDone) sin que haya sido un
+  /// 401/404 explicito, en vez de reconectar se llama a [onTerminado] una
+  /// vez y no se reintenta mas (usado por la maquina del tiempo para
+  /// reproducir una grabacion finita en vez del feed en vivo).
+  final bool finito;
+  final VoidCallback? onTerminado;
+  const MjpegView({
+    super.key,
+    required this.uri,
+    required this.headers,
+    this.finito = false,
+    this.onTerminado,
+  });
 
   @override
   State<MjpegView> createState() => _MjpegViewState();
@@ -66,7 +78,13 @@ class _MjpegViewState extends State<MjpegView> {
           }
         },
         onError: (_) => _reintentar(),
-        onDone: _reintentar,
+        onDone: () {
+          if (widget.finito) {
+            if (mounted) widget.onTerminado?.call();
+            return;
+          }
+          _reintentar();
+        },
         cancelOnError: true,
       );
     } catch (_) {
