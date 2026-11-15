@@ -134,10 +134,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(
-                      Icons.remove_red_eye_outlined,
-                      color: AppColors.acento,
-                      size: 64,
+                    Center(
+                      child: Image.asset(
+                        'assets/icono_ojo.png',
+                        width: 64,
+                        height: 64,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     const Text(

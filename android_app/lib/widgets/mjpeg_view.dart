@@ -104,7 +104,13 @@ class _MjpegViewState extends State<MjpegView> {
   void _reiniciarTemporizadorInactividad() {
     _temporizadorInactividad?.cancel();
     _temporizadorInactividad = Timer(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _error = 'La camara dejo de responder.');
+      if (!mounted) return;
+      setState(() => _error = 'La camara dejo de responder.');
+      // en modo finito (rebobinado) no hay reintento que nos saque de este
+      // estado: si no avisamos, la pantalla que nos contiene queda sin
+      // forma de volver a en vivo (el boton "Volver a en vivo" depende de
+      // este aviso, igual que cuando el rebobinado termina solo).
+      if (widget.finito) widget.onTerminado?.call();
     });
   }
 

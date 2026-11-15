@@ -150,12 +150,22 @@ class _VoiceButtonState extends State<VoiceButton> {
             children: [
               for (var i = 0; i < 3; i++)
                 _AnilloPulsante(activo: escuchando, offsetInicial: i * 400),
-              Container(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 width: 56,
                 height: 56,
-                decoration: const BoxDecoration(
-                  color: AppColors.panel,
+                decoration: BoxDecoration(
+                  color: escuchando ? AppColors.acento : AppColors.panel,
                   shape: BoxShape.circle,
+                  boxShadow: escuchando
+                      ? [
+                          BoxShadow(
+                            color: AppColors.acento.withValues(alpha: 0.6),
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
                 ),
                 alignment: Alignment.center,
                 child: AnimatedSwitcher(
@@ -170,6 +180,12 @@ class _VoiceButtonState extends State<VoiceButton> {
                       : _IconoPulsante(
                           key: const ValueKey('microfono'),
                           activo: escuchando,
+                          // mientras se escucha, el circulo se ilumina de
+                          // acento: el icono pasa a oscuro para seguir
+                          // contrastando (si no, queda acento sobre acento).
+                          color: escuchando
+                              ? AppColors.panel
+                              : AppColors.acento,
                         ),
                 ),
               ),
@@ -280,8 +296,13 @@ class _AnilloPulsanteState extends State<_AnilloPulsante> {
 /// 1.0 en reposo.
 class _IconoPulsante extends StatefulWidget {
   final bool activo;
+  final Color color;
 
-  const _IconoPulsante({super.key, required this.activo});
+  const _IconoPulsante({
+    super.key,
+    required this.activo,
+    this.color = AppColors.acento,
+  });
 
   @override
   State<_IconoPulsante> createState() => _IconoPulsanteState();
@@ -312,7 +333,7 @@ class _IconoPulsanteState extends State<_IconoPulsante> {
       scale: widget.activo && _arriba ? 1.15 : 1.0,
       duration: const Duration(milliseconds: 400),
       onEnd: _onLatidoTerminado,
-      child: const IconoMicrofono(),
+      child: IconoMicrofono(color: widget.color),
     );
   }
 }
