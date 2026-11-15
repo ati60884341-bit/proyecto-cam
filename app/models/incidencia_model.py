@@ -45,6 +45,10 @@ def conteo_por_zona():
     )
 
 
-def contar_hoy():
-    fila = query_one("SELECT COUNT(*) AS Total FROM cam.Incidencias WHERE CAST(FechaHora AS DATE) = CAST(SYSDATETIME() AS DATE)")
+def contar_hoy(incluir_simulacros=False):
+    filtro_tipo = "" if incluir_simulacros else " AND Tipo <> 'Simulacro'"
+    fila = query_one(
+        "SELECT COUNT(*) AS Total FROM cam.Incidencias "
+        "WHERE CAST(FechaHora AS DATE) = CAST(SYSDATETIME() AS DATE)" + filtro_tipo
+    )
     return fila["Total"] if fila else 0
