@@ -100,7 +100,7 @@ hilo._actualizar_sabotaje(TAPADA)
 demora_ms = (_time.perf_counter() - inicio) * 1000
 assert estados == ["sabotaje"], estados
 assert demora_ms < 150, f"la deteccion freno la lectura de la camara {demora_ms:.0f} ms"
-from PyQt6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication
 
 aplicacion = QCoreApplication.instance() or QCoreApplication([])
 limite = _time.time() + 15
@@ -113,4 +113,21 @@ for ruta in evidencias[0][1:3]:
     assert os.path.getsize(ruta) > 0
     os.remove(ruta)
 
-print("OK sabotaje: 4 casos")
+# 5) reconectar con la camara TODAVIA tapada no debe dejar el aviso trabado:
+#    _iniciar_aprendizaje (llamado en cada reconexion, ver run()) tiene que
+#    soltar _en_sabotaje para que una tapada real, despues de reconectar,
+#    pueda volver a avisar
+camera_service.time.time = reloj
+hilo, estados = nuevo_hilo()
+hilo._iniciar_aprendizaje()
+pasar(hilo, reloj, escena(), 5)
+pasar(hilo, reloj, TAPADA, 1)
+assert hilo._en_sabotaje, "deberia seguir tapada"
+hilo._iniciar_aprendizaje()  # simula la reconexion (ej. hiccup de red/USB)
+assert not hilo._en_sabotaje, "una reconexion debe soltar el aviso trabado"
+pasar(hilo, reloj, escena(), 16)  # la camara ya no esta tapada: aprende la escena normal (y pasa el enfriamiento de 15 s)
+pasar(hilo, reloj, TAPADA, 1)  # y ahora SI la tapan de verdad
+assert estados.count("sabotaje") == 2, f"no volvio a avisar tras la reconexion: {estados}"
+_time.time = tiempo_real
+
+print("OK sabotaje: 5 casos")
