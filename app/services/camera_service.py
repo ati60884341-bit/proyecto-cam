@@ -15,6 +15,7 @@ os.environ.setdefault(
 )
 
 import cv2
+import numpy as np
 from PySide6.QtCore import QThread, Signal
 
 from app.config import BUFFER_SEGUNDOS, CAPTURA_FPS, UMBRAL_SABOTAJE, EVIDENCIAS_DIR
@@ -578,6 +579,21 @@ class CamaraThread(QThread):
         frame = cv2.convertScaleAbs(frame, alpha=BRILLO_EXTRA_ANDROID_ALPHA, beta=BRILLO_EXTRA_ANDROID_BETA)
         ok_jpg, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, CALIDAD_JPEG_BUFFER])
         return jpg.tobytes() if ok_jpg else None
+
+    def obtener_buffer_jpeg_brillante(self):
+        # todo el buffer de la "maquina del tiempo" con el mismo realce de
+        # brillo que obtener_ultimo_jpeg, para que la app de Android pueda
+        # rebobinar sin ver la camara oscura
+        cuadros = []
+        for jpg_bytes in self._buffer:
+            frame = cv2.imdecode(np.frombuffer(jpg_bytes, np.uint8), cv2.IMREAD_COLOR)
+            if frame is None:
+                continue
+            frame = cv2.convertScaleAbs(frame, alpha=BRILLO_EXTRA_ANDROID_ALPHA, beta=BRILLO_EXTRA_ANDROID_BETA)
+            ok_jpg, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, CALIDAD_JPEG_BUFFER])
+            if ok_jpg:
+                cuadros.append(jpg.tobytes())
+        return cuadros
 
 
 class DeteccionCamarasUSBThread(QThread):
