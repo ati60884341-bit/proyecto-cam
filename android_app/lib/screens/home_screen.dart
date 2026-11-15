@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../theme.dart';
+import '../voice_commands.dart';
 import 'login_screen.dart';
 import 'incidencias_screen.dart';
 import 'live_camera_screen.dart';
 import '../widgets/eye_loader.dart';
+import '../widgets/voice_button.dart';
 
 /// Pantalla principal: resumen + estado en vivo de cada camara. Se actualiza
 /// sola cada 5 s (sondeo simple - no hay push todavia, ver README del
@@ -75,11 +77,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Maneja un comando de voz interpretado por [VoiceButton]. Ver brief de
+  /// la tarea 10 para el detalle de cada caso.
+  void _onComandoVoz(ComandoVoz comando) {
+    switch (comando) {
+      case AbrirCamaraPorIndice(indice: final i):
+        if (i >= _camaras.length) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No existe la camara ${i + 1}.')),
+          );
+          return;
+        }
+        _abrirCamara(_camaras[i]);
+      case IrAIncidencias():
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => IncidenciasScreen(api: widget.api),
+          ),
+        );
+      case IrAInicio():
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      case SimularIncidenteVoz():
+        // TODO(Tarea 16): navegar a SimulacroScreen una vez que exista
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Función de simulación disponible próximamente.'),
+          ),
+        );
+      case CerrarSesionVoz():
+        _cerrarSesion();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final resumen = _resumen;
     return Scaffold(
       backgroundColor: AppColors.fondo,
+      floatingActionButton: VoiceButton(onComando: _onComandoVoz),
       appBar: AppBar(
         backgroundColor: AppColors.fondo,
         title: const Text('Centro de monitoreo'),
@@ -194,6 +229,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Navega a [LiveCameraScreen] para [c], o avisa que no hay señal si
+  /// corresponde. Usado tanto por el tap manual en la fila como por el
+  /// comando de voz "camara N" (ver [_onComandoVoz]).
+  void _abrirCamara(Camara c) {
+    if (!c.enLinea) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Camara sin senal.')));
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LiveCameraScreen(api: widget.api, camara: c),
+      ),
+    );
+  }
+
   Widget _filaCamara(Camara c) {
     final color = c.enSabotaje
         ? AppColors.error
@@ -202,18 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ? 'Posible sabotaje'
         : (c.enLinea ? 'En linea' : 'Sin senal');
     return GestureDetector(
-      onTap: () {
-        if (!c.enLinea) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Camara sin senal.')));
-          return;
-        }
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => LiveCameraScreen(api: widget.api, camara: c),
-          ),
-        );
-      },
+      onTap: () => _abrirCamara(c),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
