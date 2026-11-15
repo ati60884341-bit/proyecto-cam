@@ -115,6 +115,7 @@ class ApiClient {
   Map<String, String> get _cabeceras => {'Authorization': 'Bearer $token'};
 
   Uri streamUri(String zona) => _uri('/camaras/$zona/stream.mjpg');
+  Uri rewindUri(String zona) => _uri('/camaras/$zona/rewind.mjpg');
   Map<String, String> get authHeaders => _cabeceras;
 
   Future<T> _get<T>(String path, T Function(dynamic) parse) async {
