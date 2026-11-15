@@ -99,6 +99,24 @@ def stream_camara(zona: str, authorization: str = Header(default=None)):
     return StreamingResponse(generar_cuadros(), media_type="multipart/x-mixed-replace; boundary=cuadro")
 
 
+@app.get("/camaras/{zona}/rewind.mjpg")
+def rewind_camara(zona: str, authorization: str = Header(default=None)):
+    _validar_token(authorization)
+    if _monitoreo_controller is None:
+        raise HTTPException(status_code=503, detail="El Centro de Monitoreo todavia no arranco.")
+    hilo = _monitoreo_controller.hilos_camara.get(zona)
+    if hilo is None:
+        raise HTTPException(status_code=404, detail="Camara no encontrada.")
+
+    def generar_repeticion():
+        for jpg in hilo.obtener_buffer_jpeg_brillante():
+            yield (b"--cuadro\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                   + str(len(jpg)).encode() + b"\r\n\r\n" + jpg + b"\r\n")
+            time.sleep(INTERVALO_STREAM_SEG)
+
+    return StreamingResponse(generar_repeticion(), media_type="multipart/x-mixed-replace; boundary=cuadro")
+
+
 @app.get("/incidencias")
 def incidencias(limite: int = 20, authorization: str = Header(default=None)):
     _validar_token(authorization)

@@ -24,6 +24,10 @@ class _HiloFalso:
 
         return cv2.imencode(".jpg", np.zeros((4, 4, 3), np.uint8))[1].tobytes()
 
+    def obtener_buffer_jpeg_brillante(self):
+        jpg = self.obtener_ultimo_jpeg()
+        return [jpg, jpg, jpg]
+
 
 class _MonitoreoFalso:
     _alarma_sonando = False
@@ -102,6 +106,15 @@ except requests.exceptions.ConnectionError:
 r.close()
 cuadros_recibidos = recibido.count(b"--cuadro\r\n")
 assert cuadros_recibidos <= 1, f"se reenvio el mismo cuadro {cuadros_recibidos} veces"
+
+# 7c) rebobinado: manda los 3 cuadros del buffer y la respuesta termina sola
+r = requests.get(f"{BASE}/camaras/Cam-Ingreso-01/rewind.mjpg", headers=cabecera, timeout=5)
+assert r.status_code == 200, r.text
+assert r.content.count(b"--cuadro\r\n") == 3, r.content.count(b"--cuadro\r\n")
+
+# 7d) rebobinado de una camara que no existe
+r = requests.get(f"{BASE}/camaras/Zona-Que-No-Existe/rewind.mjpg", headers=cabecera, timeout=3)
+assert r.status_code == 404, r.text
 
 # 8) login con clave mala
 r = requests.post(f"{BASE}/login", json={"usuario": "admin", "clave": "no-es-esta"}, timeout=5)
