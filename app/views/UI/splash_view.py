@@ -1,5 +1,5 @@
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QApplication
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QApplication
 
 from app.views.UI.fondo_nocturno import FondoNocturno
 from app.views.UI.pantalla import tamano_adaptado
@@ -16,7 +16,7 @@ class SplashView(QWidget):
     (aqui ANIMADA) para que la identidad visual del programa se sienta
     desde el primer instante, no solo despues de iniciar sesion."""
 
-    terminado = pyqtSignal()
+    terminado = Signal()
 
     def __init__(self, duracion_ms=2200, parent=None):
         super().__init__(parent)

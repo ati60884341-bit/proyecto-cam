@@ -1,6 +1,6 @@
 """Seccion que se abre/cierra con un clic: esconde los campos que casi
 nadie toca (puerto, canal, perfiles...) para que el formulario se vea corto."""
-from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 ESTILO_TITULO = (
     "QPushButton { background: transparent; border: none; color: #7fd6e8; text-align: left; padding: 4px 0; }"

@@ -12,7 +12,7 @@ def construir_url_canal(marca, ip, puerto, usuario, clave, canal, flujo_principa
     if not ip:
         return ""
     puerto = puerto or "554"
-    canal = canal or "1"
+    canal = "1" if canal is None else canal  # "or" trataria un canal 0 valido como si faltara
     usuario = usuario or "admin"
     if marca == "Hikvision":
         # canal 1 principal -> 101, canal 1 secundario -> 102, canal 2 -> 201/202, etc.

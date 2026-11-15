@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from app.config import INTERVALO_FATIGA_SEG, TOLERANCIA_FATIGA_SEG
 
@@ -7,9 +7,9 @@ class AuditorFatiga(QObject):
     """Dead man's switch: pide confirmacion periodica al vigilante.
     Si no responde a tiempo, emite fatiga_detectada."""
 
-    pedir_confirmacion = pyqtSignal()
-    fatiga_detectada = pyqtSignal()
-    confirmado = pyqtSignal()
+    pedir_confirmacion = Signal()
+    fatiga_detectada = Signal()
+    confirmado = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

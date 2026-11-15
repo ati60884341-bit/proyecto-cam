@@ -1,7 +1,7 @@
 import queue
 import time
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 SEGUNDOS_SOSTENIDO = 3.0
 MIN_MANOS_ARRIBA = 1          # basta una mano (senal de auxilio) o dos (manos arriba)
@@ -20,9 +20,9 @@ class DetectorPanicoThread(QThread):
     gesto de 'mano(s) arriba' sostenido SEGUNDOS_SOSTENIDO segundos (modo panico
     silencioso, sin botones fisicos)."""
 
-    gesto_detectado = pyqtSignal()
-    no_disponible = pyqtSignal(str)
-    progreso = pyqtSignal(bool, float)  # detectando_ahora, segundos_sostenidos
+    gesto_detectado = Signal()
+    no_disponible = Signal(str)
+    progreso = Signal(bool, float)  # detectando_ahora, segundos_sostenidos
 
     def __init__(self, parent=None):
         super().__init__(parent)

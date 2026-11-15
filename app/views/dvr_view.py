@@ -1,6 +1,6 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit,
     QComboBox, QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
     QTextEdit, QScrollArea, QButtonGroup,
@@ -27,15 +27,15 @@ class DvrView(QWidget):
     hace el software del fabricante (iVMS-4200 de Hikvision, SmartPSS de
     Dahua, etc.) al "buscar" los canales de un grabador."""
 
-    registrar_solicitado = pyqtSignal(dict)
-    detectar_nuevos_solicitado = pyqtSignal(int)
-    quitar_solicitado = pyqtSignal(int)
-    refrescar_solicitado = pyqtSignal()
-    usar_perfil_solicitado = pyqtSignal(int)
-    guardar_perfil_solicitado = pyqtSignal(dict)
-    agregar_nota_solicitada = pyqtSignal(int, str)
-    fila_dvr_seleccionada = pyqtSignal(object)  # id_dispositivo o None
-    primera_vez_visible = pyqtSignal()  # dispara el checklist de red (una vez por sesion)
+    registrar_solicitado = Signal(dict)
+    detectar_nuevos_solicitado = Signal(int)
+    quitar_solicitado = Signal(int)
+    refrescar_solicitado = Signal()
+    usar_perfil_solicitado = Signal(int)
+    guardar_perfil_solicitado = Signal(dict)
+    agregar_nota_solicitada = Signal(int, str)
+    fila_dvr_seleccionada = Signal(object)  # id_dispositivo o None
+    primera_vez_visible = Signal()  # dispara el checklist de red (una vez por sesion)
 
     def __init__(self, parent=None):
         super().__init__(parent)

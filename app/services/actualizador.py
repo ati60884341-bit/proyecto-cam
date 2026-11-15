@@ -8,7 +8,7 @@ import os
 import urllib.error
 import urllib.request
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from app.version import VERSION
 
@@ -73,8 +73,8 @@ class HiloBuscarActualizacion(QThread):
     de red, no debe congelar el programa ni atrasar el login mientras
     responde (o mientras se queda esperando el timeout)."""
 
-    encontrada = pyqtSignal(dict)
-    sin_novedad = pyqtSignal()
+    encontrada = Signal(dict)
+    sin_novedad = Signal()
 
     def run(self):
         info = buscar_actualizacion()
@@ -85,9 +85,9 @@ class HiloBuscarActualizacion(QThread):
 
 
 class HiloDescargarActualizacion(QThread):
-    progreso = pyqtSignal(int, int)  # bytes leidos, bytes totales (0 si no se informo)
-    terminado = pyqtSignal(str)      # ruta local del instalador ya descargado
-    fallo = pyqtSignal(str)
+    progreso = Signal(int, int)  # bytes leidos, bytes totales (0 si no se informo)
+    terminado = Signal(str)      # ruta local del instalador ya descargado
+    fallo = Signal(str)
 
     def __init__(self, url, destino, parent=None):
         super().__init__(parent)

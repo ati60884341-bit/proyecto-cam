@@ -4,7 +4,7 @@ import time
 
 import cv2
 import numpy as np
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from app.config import EVIDENCIAS_DIR
 from app.services import alertas_service, whatsapp_service
@@ -13,7 +13,7 @@ from app.services.hash_service import firmar_archivo
 
 class _Puente(QObject):
     """El envio de prueba corre en un hilo comun: esta senal vuelve al hilo de la UI."""
-    resultado = pyqtSignal(bool, str)
+    resultado = Signal(bool, str)
 
 
 class AlertasController:

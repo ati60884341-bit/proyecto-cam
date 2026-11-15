@@ -1,6 +1,6 @@
 import traceback
 
-from PyQt6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 
 from app.models import camara_model, zona_model
 from app.services.camera_service import PruebaConexionThread, DeteccionCamarasUSBThread
@@ -10,7 +10,7 @@ class CamaraController:
     """Alta/baja de camaras de cualquier marca (adaptador universal RTSP/USB),
     segun el pilar 2 de la propuesta del proyecto."""
 
-    def __init__(self, view, usuario, on_camara_agregada, on_camara_quitada, programar_arranque_nativo):
+    def __init__(self, view, usuario, on_camara_agregada, on_camara_quitada, programar_arranque_nativo, camaras_iniciales=None):
         self.view = view
         self.usuario = usuario
         self.on_camara_agregada = on_camara_agregada
@@ -31,7 +31,13 @@ class CamaraController:
         self.view.probar_solicitado.connect(self.probar_conexion)
         self.view.detectar_usb_solicitado.connect(self.detectar_camaras_usb)
         self.view.permitir_quitar(usuario["Rol"] == "Administrador")
-        self.cargar()
+        if camaras_iniciales is None:
+            self.cargar()
+        else:
+            # ya la trajo AppController al construir la ventana: evitar una
+            # segunda consulta identica a la base justo al iniciar sesion
+            self._camaras = camaras_iniciales
+            self.view.cargar(self._camaras)
 
     def cargar(self):
         self._camaras = camara_model.listar()

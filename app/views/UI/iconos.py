@@ -3,8 +3,8 @@ que dependan de un plugin de Qt que podria faltar): cada uno es una funcion
 chica que traza 2-4 formas simples dentro de un cuadrado, al estilo de los
 iconos de la vista previa de diseno (linea fina, sin relleno salvo detalles)."""
 
-from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
 
 
 def _pluma(pintor, color, ancho=1.6):

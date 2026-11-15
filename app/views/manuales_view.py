@@ -1,7 +1,7 @@
 import os
 import webbrowser
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit, QPushButton, QApplication,
 )
 
@@ -87,5 +87,5 @@ class ManualesView(QWidget):
         def restaurar():
             boton.setText(texto_original)
 
-        from PyQt6.QtCore import QTimer
+        from PySide6.QtCore import QTimer
         QTimer.singleShot(1500, restaurar)

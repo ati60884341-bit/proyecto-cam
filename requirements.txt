@@ -1,5 +1,5 @@
 pyodbc
-PyQt6
+PySide6
 opencv-python==4.11.0.86
 numpy<2
 pyttsx3
@@ -10,3 +10,6 @@ matplotlib
 onvif-zeep
 requests
 qrcode[pil]
+fastapi
+uvicorn[standard]
+pyjwt

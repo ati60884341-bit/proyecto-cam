@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 # tamano minimo por debajo del cual la ventana deja de ser usable (los
 # controles empiezan a superponerse/cortarse)

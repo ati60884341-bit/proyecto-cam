@@ -1,7 +1,7 @@
 import cv2
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSizePolicy
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSizePolicy
 
 ESTILO_NORMAL = "QFrame#zonaFrame { border: 3px solid #3a3f44; border-radius: 6px; background: #111; }"
 ESTILO_SABOTAJE = "QFrame#zonaFrame { border: 3px solid #e53935; border-radius: 6px; background: #220000; }"
@@ -30,10 +30,10 @@ class ZonaFrame(QFrame):
     """Recuadro de UNA camara: numero para la voz, video en vivo, estado y
     botones. nombre_zona es la clave de la camara (su nombre)."""
 
-    capturar_evidencia = pyqtSignal(str)   # clave de la camara
-    ampliar_zona = pyqtSignal(str)
-    reconectar_zona = pyqtSignal(str)
-    ocultar_zona = pyqtSignal(str)
+    capturar_evidencia = Signal(str)   # clave de la camara
+    ampliar_zona = Signal(str)
+    reconectar_zona = Signal(str)
+    ocultar_zona = Signal(str)
 
     def __init__(self, nombre_zona, nombre_camara, parent=None):
         super().__init__(parent)

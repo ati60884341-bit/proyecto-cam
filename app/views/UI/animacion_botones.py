@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QEvent, QObject, QPropertyAnimation
-from PyQt6.QtWidgets import QGraphicsOpacityEffect, QPushButton
+from PySide6.QtCore import QEvent, QObject, QPropertyAnimation
+from PySide6.QtWidgets import QGraphicsOpacityEffect, QPushButton
 
 DURACION_MS = 120
 OPACIDAD_HOVER = 0.82

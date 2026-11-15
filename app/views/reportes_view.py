@@ -1,5 +1,5 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
@@ -11,7 +11,7 @@ from app.views.UI.tema import (
 
 
 class ReportesView(QWidget):
-    refrescar_solicitado = pyqtSignal()
+    refrescar_solicitado = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

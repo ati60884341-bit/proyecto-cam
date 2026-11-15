@@ -1,7 +1,7 @@
 import time
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 # puerto ONVIF: TP-Link Tapo usa 2020 (no el 80/8080 "estandar" de otras marcas)
 PUERTOS_ONVIF_POR_MARCA = {
@@ -31,7 +31,7 @@ class MovimientoPTZThread(QThread):
     C510W, que tiene motor de giro. Las llamadas ONVIF son SOAP bloqueantes,
     por eso corren en su propio hilo y nunca en el hilo de la UI."""
 
-    resultado = pyqtSignal(bool, str)
+    resultado = Signal(bool, str)
 
     def __init__(self, url_rtsp, marca, direccion, parent=None):
         super().__init__(parent)
@@ -86,7 +86,7 @@ class PresetPTZThread(QThread):
     GetPresets cada vez, porque el PresetToken que asigna cada marca/modelo
     no es predecible de antemano."""
 
-    resultado = pyqtSignal(bool, str)
+    resultado = Signal(bool, str)
 
     def __init__(self, url_rtsp, marca, numero, accion, parent=None):
         super().__init__(parent)

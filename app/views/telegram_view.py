@@ -1,6 +1,6 @@
-from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit,
     QPushButton, QTextEdit,
 )
@@ -11,9 +11,9 @@ class TelegramView(QWidget):
     sabotaje o panico, la foto + firma SHA-256 se envian de inmediato al
     celular de quien este en el canal/chat configurado (ej. el jurado)."""
 
-    guardar_solicitado = pyqtSignal(dict)
-    probar_solicitado = pyqtSignal()
-    generar_qr_solicitado = pyqtSignal(str)
+    guardar_solicitado = Signal(dict)
+    probar_solicitado = Signal()
+    generar_qr_solicitado = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)

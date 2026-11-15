@@ -1,5 +1,5 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLabel,
     QHeaderView,
 )
@@ -8,9 +8,9 @@ COLUMNAS = ["ID", "Zona", "Tipo", "Archivo", "Firma SHA-256", "Fecha", "Usuario"
 
 
 class EvidenciasView(QWidget):
-    refrescar_solicitado = pyqtSignal()
-    ver_solicitado = pyqtSignal(int)
-    eliminar_solicitado = pyqtSignal(int)
+    refrescar_solicitado = Signal()
+    ver_solicitado = Signal(int)
+    eliminar_solicitado = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)

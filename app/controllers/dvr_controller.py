@@ -1,6 +1,6 @@
 import traceback
 
-from PyQt6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 
 from app.models import camara_model, zona_model, dispositivo_dvr_model, perfil_sitio_model, bitacora_model
 from app.services.camera_service import DeteccionCanalesDVRThread

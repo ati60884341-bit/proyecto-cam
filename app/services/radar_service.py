@@ -29,7 +29,7 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 GRUPO_WS_DISCOVERY = "239.255.255.250"
 PUERTO_WS_DISCOVERY = 3702
@@ -229,9 +229,9 @@ class RadarEscaneoThread(QThread):
     cada hallazgo apenas se identifica (no espera a terminar todo), para
     que la tabla del "Radar de camaras" se vaya llenando en vivo."""
 
-    progreso = pyqtSignal(str)
-    dispositivo_encontrado = pyqtSignal(dict)
-    terminado = pyqtSignal(int)  # total de dispositivos encontrados
+    progreso = Signal(str)
+    dispositivo_encontrado = Signal(dict)
+    terminado = Signal(int)  # total de dispositivos encontrados
 
     def __init__(self, escaneo_completo=False, usuario="admin", clave="", parent=None):
         super().__init__(parent)
@@ -293,7 +293,7 @@ class ReintentoCredencialesThread(QThread):
     escaneo: para cuando una fila quedo "Desconocida" porque la camara
     (ej. Tapo) exige autenticacion hasta para GetDeviceInformation."""
 
-    resultado = pyqtSignal(dict)
+    resultado = Signal(dict)
 
     def __init__(self, ip, usuario="admin", clave="", parent=None):
         super().__init__(parent)

@@ -1,13 +1,24 @@
 import io
 
 import qrcode
+from PySide6.QtCore import QObject, Signal
 
 from app.services import telegram_service
+
+
+class _PuenteResultado(QObject):
+    """enviar_mensaje_async llama a al_terminar desde un hilo Python comun
+    (threading.Thread, no QThread): tocar un widget de ahi directo es
+    inseguro. Esta senal Qt vuelve al hilo de la UI antes de escribir en
+    el registro, igual que _PuenteAlertas en monitoreo_controller.py."""
+    resultado = Signal(str)
 
 
 class TelegramController:
     def __init__(self, view):
         self.view = view
+        self._puente = _PuenteResultado()
+        self._puente.resultado.connect(self.view.registrar_evento)
         self.view.guardar_solicitado.connect(self.guardar)
         self.view.probar_solicitado.connect(self.probar)
         self.view.generar_qr_solicitado.connect(self.generar_qr)
@@ -22,7 +33,7 @@ class TelegramController:
         telegram_service.enviar_mensaje_async(
             "Prueba desde CAM - Centro de Monitoreo Inteligente. Si ve este mensaje, las alertas "
             "de sabotaje y panico llegaran aqui durante la demo.",
-            al_terminar=lambda ok, msg: self.view.registrar_evento(msg),
+            al_terminar=lambda ok, msg: self._puente.resultado.emit(msg),
         )
 
     def generar_qr(self, bot_username):

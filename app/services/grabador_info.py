@@ -4,7 +4,7 @@ hilo aparte y sin bloquear nada: si un equipo no responde, su grupo queda
 con el titulo generico "Grabador"."""
 import re
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 RUTAS_MODELO = {
     "Hikvision": "/ISAPI/System/deviceInfo",
@@ -46,7 +46,7 @@ def consultar_modelo(marca, ip, usuario, clave, timeout=4.0):
 
 
 class IdentificarGrabadoresThread(QThread):
-    identificado = pyqtSignal(int, str, str)  # IdDispositivo, tipo, modelo
+    identificado = Signal(int, str, str)  # IdDispositivo, tipo, modelo
 
     def __init__(self, dispositivos, parent=None):
         super().__init__(parent)

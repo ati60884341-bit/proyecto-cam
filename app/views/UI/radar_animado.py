@@ -3,9 +3,9 @@ cada equipo encontrado (en una posicion fija derivada de su IP)."""
 import math
 import zlib
 
-from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
-from PyQt6.QtGui import QColor, QConicalGradient, QPainter, QPen, QRadialGradient
-from PyQt6.QtWidgets import QSizePolicy, QWidget
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
+from PySide6.QtGui import QColor, QConicalGradient, QPainter, QPen, QRadialGradient
+from PySide6.QtWidgets import QSizePolicy, QWidget
 
 TEAL = QColor("#36d6c9")
 

@@ -1,6 +1,6 @@
 # CAM — Sistema Inteligente de Videovigilancia y Auditoria
 
-Software de escritorio (Python + PyQt6, arquitectura **MVC**) con base de datos
+Software de escritorio (Python + PySide6, arquitectura **MVC**) con base de datos
 **SQL Server** (triggers de auditoria) para el proyecto "Sistema Inteligente de
 Videovigilancia y Auditoria" (4 zonas: Ingreso, Patio, Estacionamiento, Pasillo).
 
@@ -12,7 +12,7 @@ ProyectoCAM/
   app/
     database/             conexion_bd.py: conexion a SQL Server (pyodbc)
     models/                Modelo: una clase/archivo por entidad (consultas SQL)
-    views/                 Vista: pantallas PyQt6 (login, dashboard, tablas, etc.)
+    views/                 Vista: pantallas PySide6 (login, dashboard, tablas, etc.)
       UI/                   frames y dialogos reutilizables (QFrame, QDialog)
     controllers/           Controlador: logica que conecta vista <-> modelo
     services/              camara (QThread), sabotaje, voz, panico, fatiga, SHA-256
@@ -80,7 +80,7 @@ PC), vea `db/05_acceso_red.sql` y la seccion 7 de este documento.
 pip install -r requirements.txt
 ```
 
-Incluye: `pyodbc`, `PyQt6`, `opencv-python`, `pyttsx3`, `SpeechRecognition`,
+Incluye: `pyodbc`, `PySide6`, `opencv-python`, `pyttsx3`, `SpeechRecognition`,
 `pyaudio`, `mediapipe`, `matplotlib`.
 
 Si `pyaudio` o `mediapipe` no instalan en su equipo, la app sigue funcionando:
@@ -346,7 +346,7 @@ venv\Scripts\pip install pyinstaller
 venv\Scripts\pyinstaller.exe CAM.spec
 ```
 
-Esto crea `dist\ProyectoCAM\` (unos 400 MB: incluye PyQt6, OpenCV, mediapipe
+Esto crea `dist\ProyectoCAM\` (unos 400 MB: incluye PySide6, OpenCV, mediapipe
 y el resto de dependencias). Pruebe que arranca con
 `dist\ProyectoCAM\ProyectoCAM.exe` antes de seguir.
 

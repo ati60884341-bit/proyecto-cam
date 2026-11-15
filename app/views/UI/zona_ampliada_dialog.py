@@ -1,5 +1,5 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel
 
 from app.views.UI.zona_frame import frame_a_pixmap
 from app.views.UI.pantalla import tamano_adaptado

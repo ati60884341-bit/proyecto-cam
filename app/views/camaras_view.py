@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QSize, QTimer, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QSize, QTimer, Signal
+from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit,
     QComboBox, QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
 )
@@ -47,11 +47,11 @@ class CamarasView(QWidget):
     """Alta de camaras sueltas (sin DVR/NVR): IP de cualquier marca por
     RTSP, o la webcam USB de la PC."""
 
-    agregar_solicitado = pyqtSignal(dict)
-    quitar_solicitado = pyqtSignal(int)
-    refrescar_solicitado = pyqtSignal()
-    probar_solicitado = pyqtSignal(dict)
-    detectar_usb_solicitado = pyqtSignal()
+    agregar_solicitado = Signal(dict)
+    quitar_solicitado = Signal(int)
+    refrescar_solicitado = Signal()
+    probar_solicitado = Signal(dict)
+    detectar_usb_solicitado = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

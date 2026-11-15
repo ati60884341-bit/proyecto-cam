@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton,
     QLabel, QLineEdit, QTextEdit, QCheckBox, QComboBox, QDialog, QScrollArea,
 )
@@ -76,18 +76,18 @@ def html_manual_comandos(camaras, numeros_ptz):
 
 
 class DashboardView(QWidget):
-    comando_manual_enviado = pyqtSignal(str)
-    hablar_presionado = pyqtSignal()
-    hablar_soltado = pyqtSignal()
-    panico_manual = pyqtSignal()
-    fatiga_confirmada = pyqtSignal()
-    capturar_evidencia = pyqtSignal(str)
-    ampliar_zona = pyqtSignal(str)
-    reconectar_zona = pyqtSignal(str)
-    deteccion_gesto_alternada = pyqtSignal(bool)
-    alarma_silenciada = pyqtSignal()
-    ocultar_zona = pyqtSignal(str)
-    mostrar_zona = pyqtSignal(str)
+    comando_manual_enviado = Signal(str)
+    hablar_presionado = Signal()
+    hablar_soltado = Signal()
+    panico_manual = Signal()
+    fatiga_confirmada = Signal()
+    capturar_evidencia = Signal(str)
+    ampliar_zona = Signal(str)
+    reconectar_zona = Signal(str)
+    deteccion_gesto_alternada = Signal(bool)
+    alarma_silenciada = Signal()
+    ocultar_zona = Signal(str)
+    mostrar_zona = Signal(str)
 
     CLAVE_INDEPENDIENTES = "independientes"
 

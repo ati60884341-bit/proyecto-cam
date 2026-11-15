@@ -1,5 +1,5 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLabel,
     QHeaderView,
 )
@@ -8,8 +8,8 @@ COLUMNAS = ["ID", "Zona", "Tipo", "Severidad", "Descripcion", "Fecha/Hora", "Ate
 
 
 class IncidenciasView(QWidget):
-    refrescar_solicitado = pyqtSignal()
-    atender_solicitado = pyqtSignal(int)
+    refrescar_solicitado = Signal()
+    atender_solicitado = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)

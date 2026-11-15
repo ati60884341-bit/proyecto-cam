@@ -1,5 +1,5 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit,
     QPushButton, QCheckBox, QTextEdit, QMessageBox, QScrollArea,
 )
@@ -33,10 +33,10 @@ class AlertasView(QWidget):
     """Pestana "Alertas al celular": WhatsApp (principal) en 3 pasos y
     Telegram como respaldo automatico."""
 
-    guardar_whatsapp_solicitado = pyqtSignal(dict)
-    ventana_abierta_avisada = pyqtSignal()
-    probar_whatsapp_solicitado = pyqtSignal()
-    whatsapp_activo_cambiado = pyqtSignal(bool)
+    guardar_whatsapp_solicitado = Signal(dict)
+    ventana_abierta_avisada = Signal()
+    probar_whatsapp_solicitado = Signal()
+    whatsapp_activo_cambiado = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)

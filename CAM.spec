@@ -27,12 +27,13 @@ datas += [("app/manuales/conectar_camaras.html", "app/manuales"),
 datas += [
     ("app/recursos/imagenes/fondo_nocturno.png", "app/recursos/imagenes"),
     ("app/recursos/imagenes/fondo_nocturno.gif", "app/recursos/imagenes"),
+    ("app/recursos/imagenes/icono_cam.ico", "app/recursos/imagenes"),
 ]
 
 hiddenimports = [
     "pyttsx3.drivers",
     "pyttsx3.drivers.sapi5",
-    "PyQt6.QtMultimedia",  # la sirena (alarma_service) la carga dentro de una funcion
+    "PySide6.QtMultimedia",  # la sirena (alarma_service) la carga dentro de una funcion
 ]
 
 a = Analysis(
@@ -63,6 +64,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
+    icon="app/recursos/imagenes/icono_cam.ico",
 )
 
 coll = COLLECT(

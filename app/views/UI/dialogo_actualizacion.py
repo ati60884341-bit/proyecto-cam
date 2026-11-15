@@ -2,7 +2,7 @@ import os
 import subprocess
 import tempfile
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QTextEdit,
     QApplication, QMessageBox,
 )
@@ -14,7 +14,7 @@ class DialogoActualizacion(QDialog):
     """Se muestra cuando HiloBuscarActualizacion encuentra una version mas
     nueva publicada en GitHub. "Actualizar ahora" descarga el instalador
     (con barra de progreso, puede pesar varios cientos de MB por
-    PyQt6/opencv/mediapipe) y lo abre - el instalador mismo cierra este
+    PySide6/opencv/mediapipe) y lo abre - el instalador mismo cierra este
     programa y lo reemplaza (ver installer.iss, CloseApplications)."""
 
     def __init__(self, info, parent=None):

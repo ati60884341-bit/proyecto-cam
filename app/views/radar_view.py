@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QCheckBox, QPushButton,
     QMessageBox, QScrollArea, QFrame,
 )
@@ -85,10 +85,10 @@ class RadarView(QWidget):
     La marca/modelo son reales (el equipo se identifica via ONVIF); si es
     camara o grabador es una estimacion por cantidad de canales."""
 
-    escanear_solicitado = pyqtSignal(dict)  # {escaneo_completo, usuario, clave}
-    reintentar_solicitado = pyqtSignal(dict)  # {ip, usuario, clave}
-    usar_en_camaras_solicitado = pyqtSignal(dict)
-    usar_en_dvr_solicitado = pyqtSignal(dict)
+    escanear_solicitado = Signal(dict)  # {escaneo_completo, usuario, clave}
+    reintentar_solicitado = Signal(dict)  # {ip, usuario, clave}
+    usar_en_camaras_solicitado = Signal(dict)
+    usar_en_dvr_solicitado = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)

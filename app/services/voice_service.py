@@ -3,7 +3,7 @@ import threading
 import time
 import unicodedata
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 NUMEROS = {
     "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6, "siete": 7,
@@ -175,9 +175,9 @@ class GrabacionVozThread(QThread):
     listen(), que corta la frase en la primera pausa: "ingreso ... zoom"
     llegaba como solo "ingreso"."""
 
-    texto_reconocido = pyqtSignal(str)
-    texto_parcial = pyqtSignal(str)       # lo entendido hasta ahora, mientras se habla
-    error_reconocimiento = pyqtSignal(str)
+    texto_reconocido = Signal(str)
+    texto_parcial = Signal(str)       # lo entendido hasta ahora, mientras se habla
+    error_reconocimiento = Signal(str)
 
     COLA_SEG = 0.3        # se sigue grabando un poco tras soltar: la ultima palabra no se corta
     MINIMO_SEG = 0.4

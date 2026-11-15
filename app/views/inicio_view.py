@@ -3,8 +3,8 @@ monitoreo, con la escena nocturna animada de fondo, un saludo y mensajes
 que acompanan al vigilante (para que no sienta que esta solo en el turno)."""
 import time
 
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from app.views.UI.fondo_nocturno import FondoNocturno
 
@@ -16,7 +16,6 @@ ESTILO_TARJETA = (
     "QFrame, QWidget#tarjetaInicio { background: rgba(14, 20, 30, 170); border: 1px solid rgba(127, 214, 232, 60);"
     " border-radius: 14px; }"
 )
-COLOR_ESTADO = {"ok": "#36d6a0", "aviso": "#f0c060", "error": "#ff8a8a"}
 
 
 def saludo_por_hora(hora):
@@ -67,7 +66,7 @@ class _Tarjeta(QWidget):
 
 
 class InicioView(FondoNocturno):
-    ir_a_monitoreo = pyqtSignal()
+    ir_a_monitoreo = Signal()
 
     INTERVALO_MENSAJE_MS = 7000
 
@@ -109,14 +108,13 @@ class InicioView(FondoNocturno):
         fila.setSpacing(16)
         self.tarjeta_camaras = _Tarjeta("Camaras en linea")
         self.tarjeta_incidencias = _Tarjeta("Incidencias de hoy")
-        self.tarjeta_alertas = _Tarjeta("Alertas al celular")
-        for tarjeta in (self.tarjeta_camaras, self.tarjeta_incidencias, self.tarjeta_alertas):
+        for tarjeta in (self.tarjeta_camaras, self.tarjeta_incidencias):
             tarjeta.setMaximumWidth(320)
             fila.addWidget(tarjeta)
         contenedor = QWidget()
         contenedor.setStyleSheet("background: transparent;")
         contenedor.setLayout(fila)
-        contenedor.setMaximumWidth(1000)
+        contenedor.setMaximumWidth(680)
         externo.addWidget(contenedor, alignment=Qt.AlignmentFlag.AlignHCenter)
         externo.addSpacing(28)
 
@@ -175,8 +173,7 @@ class InicioView(FondoNocturno):
         self._rotador.stop()
 
     # ---------------- resumen ----------------
-    def set_resumen(self, en_linea, total, incidencias_hoy, tipo_alertas, texto_alertas):
+    def set_resumen(self, en_linea, total, incidencias_hoy):
         color = "#36d6a0" if total and en_linea == total else ("#f0c060" if en_linea else "#ff8a8a")
         self.tarjeta_camaras.set_valor(f"{en_linea} de {total}", color)
         self.tarjeta_incidencias.set_valor(str(incidencias_hoy))
-        self.tarjeta_alertas.set_valor(texto_alertas, COLOR_ESTADO[tipo_alertas], 13)

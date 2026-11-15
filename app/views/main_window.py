@@ -1,5 +1,5 @@
-from PyQt6.QtCore import Qt, QRect, QTimer, QPropertyAnimation, QEasingCurve, QSize
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt, QRect, QTimer, QPropertyAnimation, QEasingCurve, QSize
+from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QPushButton, QLabel, QStackedWidget,
     QGraphicsOpacityEffect,
 )
@@ -25,12 +25,12 @@ _COLOR_ICONO_ACTIVO = "#36d6c9"
 _ESTILO_NAV = """
 QPushButton#navBoton {
     color: #c7cdd6; background: transparent; border: none;
-    padding: 10px 12px; text-align: left; font-size: 13px; border-radius: 8px;
-    margin: 1px 8px;
+    padding: 11px 14px; text-align: left; font-size: 13px; border-radius: 10px;
+    margin: 2px 10px;
 }
-QPushButton#navBoton:hover { background: rgba(255, 255, 255, 20); color: #ffffff; }
+QPushButton#navBoton:hover { background: rgba(255, 255, 255, 22); color: #ffffff; }
 QPushButton#navBoton[activo="true"] {
-    background: rgba(54, 214, 201, 30); color: #ffffff; font-weight: 600;
+    background: rgba(54, 214, 201, 36); color: #ffffff; font-weight: 600;
 }
 QPushButton#btnSalir {
     color: #ffd9d6; background: rgba(192, 57, 43, 60); border: 1px solid rgba(192, 57, 43, 140);
@@ -100,8 +100,8 @@ class MainWindow(QMainWindow):
             boton = QPushButton(texto)
             boton.setObjectName("navBoton")
             boton.setProperty("activo", "false")
-            boton.setIcon(icono(clave, color=_COLOR_ICONO_INACTIVO, tamano=18))
-            boton.setIconSize(QSize(18, 18))
+            boton.setIcon(icono(clave, color=_COLOR_ICONO_INACTIVO, tamano=19))
+            boton.setIconSize(QSize(19, 19))
             boton.clicked.connect(lambda _checked, k=clave: self.mostrar_seccion(k))
             layout_barra.addWidget(boton)
             self.botones[clave] = boton
@@ -111,6 +111,7 @@ class MainWindow(QMainWindow):
         self.btn_salir.setObjectName("btnSalir")
         layout_barra.addWidget(self.btn_salir)
 
+        self.barra_lateral = barra
         layout_raiz.addWidget(barra)
 
         # -------- contenido (QStackedWidget) --------
@@ -171,21 +172,37 @@ class MainWindow(QMainWindow):
         }
         self.stack.setCurrentWidget(vistas[clave])
         self._seccion_actual = clave
+        # en Inicio no hace falta la barra lateral: es la pantalla de
+        # bienvenida, con su propio boton para pasar al Centro de Monitoreo
+        barra_estaba_oculta = not self.barra_lateral.isVisible()
+        self.barra_lateral.setVisible(clave != "inicio")
 
         for k, boton in self.botones.items():
             activo = k == clave
             boton.setProperty("activo", "true" if activo else "false")
             boton.style().unpolish(boton)
             boton.style().polish(boton)
-            boton.setIcon(icono(k, color=(_COLOR_ICONO_ACTIVO if activo else _COLOR_ICONO_INACTIVO), tamano=18))
+            boton.setIcon(icono(k, color=(_COLOR_ICONO_ACTIVO if activo else _COLOR_ICONO_INACTIVO), tamano=19))
 
-        self._mover_indicador(animado=True)
+        if barra_estaba_oculta and self.barra_lateral.isVisible():
+            # la barra recien se volvio visible: el layout de sus botones
+            # todavia no se recalculo en este mismo tick (boton.height()
+            # da un valor viejo/grande), asi que el indicador se ubica
+            # sin animar una vez que el bucle de eventos lo termine de
+            # acomodar - evita que se vea gigante un instante
+            QTimer.singleShot(0, lambda: self._mover_indicador(animado=False))
+        else:
+            self._mover_indicador(animado=True)
         self._iniciar_fade_contenido()
 
     def _mover_indicador(self, animado=True):
         boton = self.botones.get(self._seccion_actual)
         if boton is None or boton.height() <= 0:
-            return  # todavia no hay layout real (ver el singleShot en __init__)
+            # todavia no hay layout real: pasa al mostrar la barra lateral
+            # por primera vez (en Inicio arranca oculta) - se reintenta
+            # apenas el bucle de eventos la termine de acomodar
+            QTimer.singleShot(0, lambda: self._mover_indicador(animado=False))
+            return
         destino = QRect(0, boton.y() + 6, 3, boton.height() - 12)
         if not animado or not self.indicador_activo.isVisible():
             self.indicador_activo.setGeometry(destino)

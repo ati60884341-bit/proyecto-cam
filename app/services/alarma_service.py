@@ -64,8 +64,8 @@ def preparar():
     if _efecto is not None:
         return
     try:
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtMultimedia import QSoundEffect
+        from PySide6.QtCore import QUrl
+        from PySide6.QtMultimedia import QSoundEffect
     except ImportError:
         return
     _efecto = QSoundEffect()

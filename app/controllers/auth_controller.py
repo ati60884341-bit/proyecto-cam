@@ -1,6 +1,6 @@
 import traceback
 
-from PyQt6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 
 from app.models import usuario_model
 from app.controllers.app_controller import AppController

@@ -17,6 +17,20 @@ def obtener(id_dispositivo):
     )
 
 
+def obtener_varios(ids_dispositivo):
+    """Igual que obtener() pero para varios ids de una sola consulta (evita
+    N consultas separadas al identificar todos los grabadores)."""
+    ids = list(ids_dispositivo)
+    if not ids:
+        return []
+    placeholders = ",".join("?" * len(ids))
+    return query(
+        "SELECT IdDispositivo, Nombre, Tipo, Marca, IP, Puerto, Usuario, Clave, CantidadCanales, CanalesPTZ "
+        f"FROM cam.DispositivosDVR WHERE IdDispositivo IN ({placeholders})",
+        tuple(ids),
+    )
+
+
 def crear(nombre, marca, ip, puerto, usuario, clave, cantidad_canales, canales_ptz=False, tipo="DVR"):
     return execute(
         "INSERT INTO cam.DispositivosDVR (Nombre, Tipo, Marca, IP, Puerto, Usuario, Clave, CantidadCanales, CanalesPTZ) "

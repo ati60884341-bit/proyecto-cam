@@ -2,9 +2,9 @@ import math
 import os
 import random
 
-from PyQt6.QtCore import Qt, QTimer, QRectF, QLineF
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QPen, QMovie
-from PyQt6.QtWidgets import QFrame
+from PySide6.QtCore import Qt, QTimer, QRectF, QLineF
+from PySide6.QtGui import QPixmap, QPainter, QColor, QPen, QMovie
+from PySide6.QtWidgets import QFrame
 
 from app.config import IMAGENES_DIR
 

@@ -24,7 +24,7 @@ claro u oscuro en cada una."""
 import os
 import tempfile
 
-from PyQt6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QPalette
 
 from app.views.UI.iconos import pixmap_icono
 

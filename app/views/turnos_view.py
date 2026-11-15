@@ -1,5 +1,5 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QPushButton, QLabel,
     QHeaderView,
 )
@@ -8,9 +8,9 @@ COLUMNAS = ["ID Turno", "Usuario", "Duracion (min)", "Cierre"]
 
 
 class TurnosView(QWidget):
-    abrir_turno_solicitado = pyqtSignal()
-    cerrar_turno_solicitado = pyqtSignal()
-    refrescar_solicitado = pyqtSignal()
+    abrir_turno_solicitado = Signal()
+    cerrar_turno_solicitado = Signal()
+    refrescar_solicitado = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

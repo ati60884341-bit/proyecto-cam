@@ -39,6 +39,7 @@ DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=installer_output
 OutputBaseFilename={#MyAppName}_Setup
+SetupIconFile=app\recursos\imagenes\icono_cam.ico
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest

@@ -11,6 +11,7 @@ from app.controllers.radar_controller import RadarController
 from app.controllers.telegram_controller import TelegramController
 from app.controllers.alertas_controller import AlertasController
 from app.controllers.inicio_controller import InicioController
+from app.services import api_service
 
 
 class AppController:
@@ -37,6 +38,7 @@ class AppController:
             on_camara_agregada=self.monitoreo_controller.agregar_camara,
             on_camara_quitada=self.monitoreo_controller.quitar_camara,
             programar_arranque_nativo=self.monitoreo_controller.encolar_arranque_nativo,
+            camaras_iniciales=camaras,
         )
         self.dvr_controller = DvrController(
             self.main_window.dvr_view, usuario,
@@ -55,8 +57,19 @@ class AppController:
             ir_a_monitoreo=lambda: self.main_window.mostrar_seccion("dashboard"),
         )
 
+        # API chica para la futura app de Android (visor + alertas): si no
+        # llega a levantar (puerto ocupado, etc.) no debe tirar abajo el
+        # Centro de Monitoreo, que es lo que de verdad importa
+        try:
+            api_service.iniciar_api(self.monitoreo_controller)
+        except Exception:
+            self.main_window.dashboard_view.registrar_evento(
+                "[API] No se pudo iniciar la API para la app movil (ver log)."
+            )
+
     def show(self):
         self.main_window.show()
 
     def detener(self):
         self.monitoreo_controller.detener()
+        self.inicio_controller.detener()

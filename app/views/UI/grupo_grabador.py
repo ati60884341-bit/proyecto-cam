@@ -3,8 +3,8 @@
 encabezado propio, para que se vea de un vistazo que camara pertenece a
 que equipo. Tambien lleva el menu "Ocultas" para volver a mostrar las
 camaras suspendidas de ese grabador."""
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QMenu, QToolButton, QVBoxLayout
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QMenu, QToolButton, QVBoxLayout
 
 ESTILO_GRUPO = (
     "QFrame#grupoGrabador { border: 1px solid #2c4a5a; border-radius: 8px; background: rgba(10, 25, 35, 160); }"
@@ -12,7 +12,7 @@ ESTILO_GRUPO = (
 
 
 class GrupoGrabador(QFrame):
-    mostrar_zona = pyqtSignal(str)
+    mostrar_zona = Signal(str)
 
     def __init__(self, titulo, columnas=2, parent=None):
         super().__init__(parent)

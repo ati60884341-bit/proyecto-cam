@@ -1,5 +1,5 @@
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QMessageBox
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QMessageBox
 
 from app.models import evidencia_model
 
