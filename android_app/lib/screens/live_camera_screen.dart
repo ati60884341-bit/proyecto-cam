@@ -22,10 +22,19 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> {
   double _vueltas = 0;
 
   void _iniciarMaquinaDelTiempo() {
+    // La vuelta del reloj se dispara primero, sola, para que el FAB
+    // (que desaparece al entrar en modo repeticion) tenga tiempo de
+    // mostrar el giro de 500ms antes de que cambie la vista.
     setState(() {
       _vueltas -= 1.0;
-      _repitiendo = true;
-      _terminoRepeticion = false;
+    });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _repitiendo = true;
+          _terminoRepeticion = false;
+        });
+      }
     });
   }
 
