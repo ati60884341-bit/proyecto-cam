@@ -4,6 +4,7 @@
          sin cifrar, si no Android bloquea todas las llamadas -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:label="CAM"
         android:name="${applicationName}"
