@@ -68,4 +68,48 @@ assert capturado_t12.get("tipo") == "Simulacro", capturado_t12
 assert capturado_t12.get("severidad") == "Normal", capturado_t12
 print("OK: _on_sabotaje con es_simulacro=True registra Tipo=Simulacro")
 
+# --- Tarea 12: MonitoreoController.disparar_simulacro(zona) ---
+from app.services import alarma_service
+
+
+class _HiloFalsoT12:
+    def __init__(self):
+        self.simulacros_disparados = 0
+
+    def disparar_simulacro(self):
+        self.simulacros_disparados += 1
+
+
+class _TimerFalsoT12:
+    def start(self, ms):
+        pass
+
+
+hilo_falso_t12 = _HiloFalsoT12()
+controller.hilos_camara = {"zona1": hilo_falso_t12}
+controller._alarma_sonando = False
+controller._timer_alarma = _TimerFalsoT12()
+controller._zonas_en_sabotaje = set()
+controller.view.set_alarma_sonando.reset_mock()
+
+original_iniciar_sirena_t12 = alarma_service.iniciar_sirena
+alarma_service.iniciar_sirena = lambda: True
+try:
+    # zona desconocida: False, sin tocar la alarma
+    assert controller.disparar_simulacro("Zona-Que-No-Existe") is False
+    assert controller._alarma_sonando is False
+    controller.view.set_alarma_sonando.assert_not_called()
+    assert hilo_falso_t12.simulacros_disparados == 0
+
+    # zona conocida: True, dispara el hilo y prende la alarma
+    assert controller.disparar_simulacro("zona1") is True
+    assert hilo_falso_t12.simulacros_disparados == 1
+    assert controller._alarma_sonando is True
+    controller.view.set_alarma_sonando.assert_called_once_with(True, [])
+    assert controller._zonas_en_sabotaje == set()
+finally:
+    alarma_service.iniciar_sirena = original_iniciar_sirena_t12
+
+print("OK: MonitoreoController.disparar_simulacro")
+
 os._exit(0)
