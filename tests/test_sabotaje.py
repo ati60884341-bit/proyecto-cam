@@ -108,7 +108,8 @@ while not evidencias and _time.time() < limite:
     aplicacion.processEvents()  # la senal llega desde el hilo de la evidencia
     _time.sleep(0.05)
 assert evidencias, "la evidencia no se guardo"
-for ruta in evidencias[0][1:]:
+assert evidencias[0][3] is False, "la deteccion real no debe marcarse como simulacro"
+for ruta in evidencias[0][1:3]:
     assert os.path.getsize(ruta) > 0
     os.remove(ruta)
 

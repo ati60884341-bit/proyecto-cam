@@ -254,7 +254,7 @@ class CamaraThread(QThread):
 
     frame_listo = Signal(object)          # numpy array BGR, para pintar en la UI
     estado_cambiado = Signal(str)         # "conectada" | "sin_senal" | "sabotaje" | "reconectando"
-    sabotaje_detectado = Signal(str, str, str)  # zona, ruta_video, ruta_foto
+    sabotaje_detectado = Signal(str, str, str, bool)  # zona, ruta_video, ruta_foto, es_simulacro
 
     def __init__(self, id_camara, zona, nombre_camara, tipo_conexion, url_conexion, parent=None):
         super().__init__(parent)
@@ -377,7 +377,15 @@ class CamaraThread(QThread):
             self._baseline_brillo = 0.98 * self._baseline_brillo + 0.02 * brillo
             self._baseline_bordes = 0.98 * self._baseline_bordes + 0.02 * bordes
 
-    def _exportar_evidencia_sabotaje(self, jpgs):
+    def disparar_simulacro(self):
+        """Disparo manual de demo: reutiliza el mismo pipeline de exportacion
+        de evidencia que la deteccion real de sabotaje, en un hilo de fondo."""
+        threading.Thread(
+            target=self._exportar_evidencia_sabotaje, args=(list(self._buffer),),
+            kwargs={"es_simulacro": True}, daemon=True,
+        ).start()
+
+    def _exportar_evidencia_sabotaje(self, jpgs, es_simulacro=False):
         frames = [f for f in (cv2.imdecode(j, cv2.IMREAD_COLOR) for j in jpgs) if f is not None]
         if not frames:
             return
@@ -397,7 +405,7 @@ class CamaraThread(QThread):
             escritor.write(f)
         escritor.release()
 
-        self.sabotaje_detectado.emit(self.zona, ruta_video, ruta_foto)
+        self.sabotaje_detectado.emit(self.zona, ruta_video, ruta_foto, es_simulacro)
 
     def _iniciar_exposicion_webcam(self, captura):
         captura.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)  # 0.25 = manual en DirectShow
