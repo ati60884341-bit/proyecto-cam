@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../theme.dart';
 import '../widgets/gif_background.dart';
+import '../widgets/marco_esquinas_qr.dart';
+import 'qr_scan_screen.dart';
 import 'welcome_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,11 +23,53 @@ class _LoginScreenState extends State<LoginScreen> {
   final _claveCtrl = TextEditingController();
   bool _cargando = false;
   String? _error;
+  Timer? _qrTimer;
 
   @override
   void initState() {
     super.initState();
     _ipCtrl.text = widget.api.ip ?? '';
+  }
+
+  @override
+  void dispose() {
+    _qrTimer?.cancel();
+    _ipCtrl.dispose();
+    _usuarioCtrl.dispose();
+    _claveCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _escanearQr() async {
+    final ip = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScanScreen()),
+    );
+    if (ip == null || !mounted) return;
+    _animarEscrituraIp(ip);
+  }
+
+  // Efecto "maquina de escribir": completa _ipCtrl caracter por caracter.
+  // Se actualiza con `.value` (no `.text`) para fijar texto y seleccion
+  // juntos y evitar el assert de TextSelection fuera de rango; al ser
+  // ChangeNotifier, el TextField se redibuja solo, sin setState.
+  void _animarEscrituraIp(String ip) {
+    _qrTimer?.cancel();
+    _ipCtrl.value = const TextEditingValue(text: '');
+    var i = 0;
+    _qrTimer = Timer.periodic(const Duration(milliseconds: 25), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      i++;
+      final texto = ip.substring(0, i);
+      _ipCtrl.value = TextEditingValue(
+        text: texto,
+        selection: TextSelection.collapsed(offset: texto.length),
+      );
+      if (i >= ip.length) timer.cancel();
+    });
   }
 
   Future<void> _ingresar() async {
@@ -104,10 +150,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    _campo(
-                      _ipCtrl,
-                      'IP del centro de monitoreo',
-                      hint: '192.168.1.10',
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: _campo(
+                            _ipCtrl,
+                            'IP del centro de monitoreo',
+                            hint: '192.168.1.10',
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'Escanear código QR',
+                          onPressed: _escanearQr,
+                          icon: const MarcoEsquinasQr(tamano: 24),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _campo(_usuarioCtrl, 'Usuario'),
