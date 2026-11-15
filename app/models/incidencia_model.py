@@ -41,7 +41,8 @@ def conteo_por_tipo():
 def conteo_por_zona():
     return query(
         "SELECT z.Nombre AS Zona, COUNT(*) AS Total FROM cam.Incidencias i "
-        "JOIN cam.Zonas z ON z.IdZona = i.IdZona GROUP BY z.Nombre ORDER BY Total DESC"
+        "JOIN cam.Zonas z ON z.IdZona = i.IdZona WHERE i.Tipo <> 'Simulacro' "
+        "GROUP BY z.Nombre ORDER BY Total DESC"
     )
 
 

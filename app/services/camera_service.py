@@ -593,7 +593,7 @@ class CamaraThread(QThread):
         # brillo que obtener_ultimo_jpeg, para que la app de Android pueda
         # rebobinar sin ver la camara oscura
         cuadros = []
-        for jpg_bytes in self._buffer:
+        for jpg_bytes in list(self._buffer):
             frame = cv2.imdecode(np.frombuffer(jpg_bytes, np.uint8), cv2.IMREAD_COLOR)
             if frame is None:
                 continue

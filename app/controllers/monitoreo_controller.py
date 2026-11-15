@@ -43,7 +43,7 @@ class _GuardarEvidenciaSabotajeThread(QThread):
     quedaban sin pintar su siguiente cuadro. Esto hace ese trabajo aca y
     devuelve lo que la UI necesita (mensaje de registro, foto+hash para la
     alerta al celular) por senal."""
-    listo = Signal(str, str, object)  # zona, mensaje_evento, (ruta_foto, hash_foto) o None
+    listo = Signal(str, str, object, bool)  # zona, mensaje_evento, (ruta_foto, hash_foto) o None, es_simulacro
 
     def __init__(self, zona, camara_info, ruta_video, ruta_foto, id_usuario, id_turno,
                  tipo="Sabotaje", severidad="Alta", parent=None):
@@ -74,11 +74,17 @@ class _GuardarEvidenciaSabotajeThread(QThread):
                     camara_info["IdZona"], ruta, tipo, hash_archivo,
                     id_usuario=self._id_usuario, id_incidencia=id_incidencia,
                 )
-        mensaje = (
-            f"[EVIDENCIA] Sabotaje en {self._zona}: foto y video (8s previos) firmados con SHA-256 y guardados."
-        )
+        es_simulacro = self._tipo == "Simulacro"
+        if es_simulacro:
+            mensaje = (
+                f"[SIMULACRO] Simulacro en {self._zona}: foto y video (8s previos) firmados con SHA-256 y guardados."
+            )
+        else:
+            mensaje = (
+                f"[EVIDENCIA] Sabotaje en {self._zona}: foto y video (8s previos) firmados con SHA-256 y guardados."
+            )
         datos_alerta = (self._ruta_foto, hash_foto) if (os.path.exists(self._ruta_foto) and hash_foto) else None
-        self.listo.emit(self._zona, mensaje, datos_alerta)
+        self.listo.emit(self._zona, mensaje, datos_alerta, es_simulacro)
 
 
 class _PuenteAlertas(QObject):
@@ -86,6 +92,14 @@ class _PuenteAlertas(QObject):
     senal Qt es la forma segura de volver al hilo de la UI para actualizar
     la bitacora sin tocar widgets desde otro hilo."""
     resultado = Signal(bool, str)
+
+
+class _PuenteSimulacro(QObject):
+    """El simulacro llega desde el telefono por la API (hilo de uvicorn, no
+    el de la UI); la alarma toca un QTimer, un QSoundEffect y botones, asi
+    que se salta al hilo de la UI con una senal (en el mismo hilo sigue
+    siendo una llamada directa)."""
+    disparado = Signal()
 
 
 class MonitoreoController:
@@ -111,6 +125,8 @@ class MonitoreoController:
         self._puente_alertas.resultado.connect(
             lambda ok, msg: self.view.registrar_evento(f"[ALERTA AL CELULAR] {msg}")
         )
+        self._puente_simulacro = _PuenteSimulacro()
+        self._puente_simulacro.disparado.connect(self._activar_alarma)
 
         self.view.capturar_evidencia.connect(self.capturar_evidencia)
         self.view.ampliar_zona.connect(self.ampliar_zona)
@@ -601,18 +617,22 @@ class MonitoreoController:
         hilo = self.hilos_camara.get(zona)
         if hilo is None:
             return False
-        self._activar_alarma()
+        self._puente_simulacro.disparado.emit()
         hilo.disparar_simulacro()
         return True
 
-    def _evidencia_sabotaje_lista(self, zona, mensaje, datos_alerta):
+    def _evidencia_sabotaje_lista(self, zona, mensaje, datos_alerta, es_simulacro=False):
         self.view.registrar_evento(mensaje)
         if datos_alerta is None:
             return
         ruta_foto, hash_foto = datos_alerta
+        encabezado = (
+            "🧪 SIMULACRO (no es un sabotaje real)\n" if es_simulacro
+            else "🚨 ALERTA: camara tapada o movida\n"
+        )
         alertas_service.enviar_alerta_async(
             ruta_foto,
-            f"🚨 ALERTA: camara tapada o movida\n"
+            f"{encabezado}"
             f"Camara: {zona}\n"
             f"Hora: {time.strftime('%d/%m/%Y %H:%M:%S')}\n"
             f"Foto: {SEGUNDOS_FOTO_ANTES} segundos antes del sabotaje\n"

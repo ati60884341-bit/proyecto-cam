@@ -56,6 +56,10 @@ Para que el Centro de Monitoreo agrupe cada grabador como "DVR" o "NVR",
 corra `db/12_tipo_grabador.sql` (agrega la columna `Tipo`; obligatoria: sin
 ella la app no lista las camaras).
 
+Para que el boton "simular incidente" de la app de Android funcione contra la
+base real, corra `db/13_tipo_simulacro.sql` (agrega `Simulacro` a los tipos
+de incidencia; sin el, el INSERT choca contra el CHECK de `Tipo`).
+
 Si ya probo la app con los datos de ejemplo de `03_seed.sql` (zonas
 Ingreso/Patio/Estacionamiento/Pasillo con camaras simuladas) y ahora va a
 trabajar con camaras reales, corra `db/08_zonas_ejemplo.sql` y despues

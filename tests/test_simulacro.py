@@ -86,6 +86,11 @@ class _TimerFalsoT12:
 
 
 hilo_falso_t12 = _HiloFalsoT12()
+# igual que en __init__ (que este test se saltea): el puente se crea en el
+# hilo de la UI
+from app.controllers.monitoreo_controller import _PuenteSimulacro
+controller._puente_simulacro = _PuenteSimulacro()
+controller._puente_simulacro.disparado.connect(controller._activar_alarma)
 controller.hilos_camara = {"zona1": hilo_falso_t12}
 controller._alarma_sonando = False
 controller._timer_alarma = _TimerFalsoT12()
@@ -111,5 +116,40 @@ finally:
     alarma_service.iniciar_sirena = original_iniciar_sirena_t12
 
 print("OK: MonitoreoController.disparar_simulacro")
+
+# --- revision final: desde otro hilo (como uvicorn) la alarma corre en el hilo de la UI ---
+import threading
+
+hilos_alarma = []
+controller._alarma_sonando = False
+puente2 = _PuenteSimulacro()
+puente2.disparado.connect(lambda: hilos_alarma.append(threading.current_thread()))
+controller._puente_simulacro = puente2
+t = threading.Thread(target=controller.disparar_simulacro, args=("zona1",))
+t.start()
+t.join()
+limite = time.time() + 3
+while not hilos_alarma and time.time() < limite:
+    aplicacion.processEvents()
+    time.sleep(0.02)
+assert hilos_alarma, "la senal del simulacro nunca llego al hilo de la UI"
+assert hilos_alarma[0] is threading.main_thread(), hilos_alarma[0]
+print("OK: disparar_simulacro desde otro hilo salta al hilo de la UI")
+
+# --- revision final: la alerta al celular de un simulacro dice que es simulacro ---
+from app.services import alertas_service
+
+textos = []
+original_enviar = alertas_service.enviar_alerta_async
+alertas_service.enviar_alerta_async = lambda ruta, texto, **k: textos.append(texto)
+controller._puente_alertas = MagicMock()
+try:
+    controller._evidencia_sabotaje_lista("zona1", "[SIMULACRO] x", ("foto.jpg", "abc"), True)
+    controller._evidencia_sabotaje_lista("zona1", "[EVIDENCIA] x", ("foto.jpg", "abc"), False)
+finally:
+    alertas_service.enviar_alerta_async = original_enviar
+assert textos[0].startswith("🧪 SIMULACRO (no es un sabotaje real)"), textos[0]
+assert textos[1].startswith("🚨 ALERTA: camara tapada o movida"), textos[1]
+print("OK: alerta de simulacro rotulada, la real sin cambios")
 
 os._exit(0)
