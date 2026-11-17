@@ -23,7 +23,7 @@ def estado():
     return "error", "Conversacion de WhatsApp cerrada (paso 2) y sin Telegram: las alertas NO llegan."
 
 
-def enviar_alerta(ruta_foto, texto):
+def enviar_alerta(ruta_foto, texto, silenciosa=False):
     """Bloquea (usar en un hilo). Devuelve (ok, mensaje para la bitacora)."""
     cfg = whatsapp_service.cargar_config()
     motivo_whatsapp = None
@@ -43,7 +43,7 @@ def enviar_alerta(ruta_foto, texto):
             return False, f"No se envio la alerta: WhatsApp no disponible ({motivo_whatsapp}) y Telegram no esta configurado."
         return False, "No se envio la alerta: configure WhatsApp o Telegram en la pestana Alertas."
     try:
-        telegram_service._enviar_foto_sync(tg["bot_token"], tg["chat_id"], ruta_foto, texto)
+        telegram_service._enviar_foto_sync(tg["bot_token"], tg["chat_id"], ruta_foto, texto, silenciosa)
     except Exception as exc:
         return False, f"No se pudo enviar la alerta por Telegram: {exc}"
     if motivo_whatsapp:
@@ -51,10 +51,10 @@ def enviar_alerta(ruta_foto, texto):
     return True, "Alerta enviada por Telegram."
 
 
-def enviar_alerta_async(ruta_foto, texto, al_terminar=None):
+def enviar_alerta_async(ruta_foto, texto, al_terminar=None, silenciosa=False):
     """Sin bloquear la UI; al_terminar(ok, mensaje) se llama desde el hilo de fondo."""
     def tarea():
-        ok, mensaje = enviar_alerta(ruta_foto, texto)
+        ok, mensaje = enviar_alerta(ruta_foto, texto, silenciosa)
         if al_terminar:
             al_terminar(ok, mensaje)
 

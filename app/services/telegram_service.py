@@ -38,11 +38,12 @@ def configurado():
     return bool(cfg["bot_token"] and cfg["chat_id"])
 
 
-def _enviar_foto_sync(bot_token, chat_id, ruta_foto, caption):
+def _enviar_foto_sync(bot_token, chat_id, ruta_foto, caption, silenciosa=False):
     url = API_BASE.format(token=bot_token, metodo="sendPhoto")
     with open(ruta_foto, "rb") as f:
         archivos = {"photo": f}
-        datos = {"chat_id": chat_id, "caption": caption}
+        # silenciosa: llega al celular sin sonar (Telegram disable_notification)
+        datos = {"chat_id": chat_id, "caption": caption, "disable_notification": silenciosa}
         respuesta = requests.post(url, data=datos, files=archivos, timeout=15)
     respuesta.raise_for_status()
     return respuesta.json()

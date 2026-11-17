@@ -17,7 +17,7 @@ from app.services.panic_service import DetectorPanicoThread
 from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread, _datos_conexion
 from app.services import alertas_service, alarma_service, imou_cloud
 from app.services.linea_virtual import DetectorLinea
-from app.services.ia_personas import AnalizadorIA, calcular_homografia
+from app.services.ia_personas import AnalizadorIA, calcular_homografia, dibujar as dibujar_personas
 from app.services import avistamientos
 from app.views.UI.zona_ampliada_dialog import ZonaAmpliadaDialog
 
@@ -799,6 +799,50 @@ class MonitoreoController:
         nombre = self.camaras_por_zona.get(zona, {}).get("Nombre", zona)
         # escribir JPGs al disco fuera del hilo de la UI
         threading.Thread(target=avistamientos.registrar, args=(nombre, personas, ahora), daemon=True).start()
+        self._alerta_silenciosa_personas(zona, nombre, personas, ahora)
+
+    SEG_ENTRE_ALERTAS_IA = 60.0
+
+    def _alerta_silenciosa_personas(self, zona, nombre, personas, ahora):
+        """Persona detectada: queda en la bitacora y como evidencia en la BD, y
+        llega al celular sin sonar (sin sirena ni voz). Una por minuto por camara."""
+        ultimas = self.__dict__.setdefault("_ultima_alerta_ia", {})
+        if ahora - ultimas.get(zona, 0.0) < self.SEG_ENTRE_ALERTAS_IA:
+            return
+        hilo = self.hilos_camara.get(zona)
+        camara = self.camaras_por_zona.get(zona)
+        frame = hilo.capturar_snapshot() if hilo else None
+        if frame is None or not camara:
+            return
+        ultimas[zona] = ahora
+        cantidad = len(personas)
+        self.view.registrar_evento(
+            f"[IA] {cantidad} persona(s) detectada(s) en {nombre} - alerta silenciosa enviada."
+        )
+        zonas_ia = hilo.ia.zonas if hilo.ia else None
+        id_usuario = self.usuario["IdUsuario"]
+
+        def tarea():
+            marca = time.strftime("%Y%m%d_%H%M%S", time.localtime(ahora))
+            ruta = os.path.join(EVIDENCIAS_DIR, f"ia_personas_{nombre}_{marca}.jpg".replace(" ", "_"))
+            cv2.imwrite(ruta, dibujar_personas(frame, personas, zonas_ia))
+            hash_foto = firmar_archivo(ruta)
+            try:
+                evidencia_model.crear(camara["IdZona"], ruta, "Foto", hash_foto, id_usuario=id_usuario)
+            except Exception as e:
+                self._puente_alertas.resultado.emit(False, f"No se guardo la evidencia de IA en la BD: {e}")
+            ok, msg = alertas_service.enviar_alerta(
+                ruta,
+                f"👤 Persona detectada (IA)\n"
+                f"Camara: {nombre}\n"
+                f"Personas: {cantidad}\n"
+                f"Hora: {time.strftime('%d/%m/%Y %H:%M:%S', time.localtime(ahora))}\n"
+                f"Firma SHA-256: {hash_foto}",
+                silenciosa=True,
+            )
+            self._puente_alertas.resultado.emit(ok, msg)
+
+        threading.Thread(target=tarea, daemon=True).start()
 
     # ---------------- linea virtual (contador de cruces) ----------------
     PAUSA_AVISO_VOZ_SEG = 4.0
