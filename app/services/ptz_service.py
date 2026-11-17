@@ -119,17 +119,29 @@ class PresetPTZThread(QThread):
             ptz = camara.create_ptz_service()
 
             presets_existentes = ptz.GetPresets({"ProfileToken": perfil.token})
+            # algunas marcas ignoran el nombre que se manda y guardan el suyo
+            # (la Imou Cruiser: token "1", nombre "Preset01"), asi que tambien
+            # se reconoce por numero
+            nombres_validos = {nombre_preset, f"Preset{self.numero:02d}"}
             token_existente = next(
-                (p.token for p in presets_existentes if getattr(p, "Name", None) == nombre_preset), None,
+                (p.token for p in presets_existentes
+                 if getattr(p, "Name", None) in nombres_validos or p.token == str(self.numero)), None,
             )
 
             if self.accion == "guardar":
                 solicitud = ptz.create_type("SetPreset")
                 solicitud.ProfileToken = perfil.token
                 solicitud.PresetName = nombre_preset
-                if token_existente:
-                    solicitud.PresetToken = token_existente  # actualiza el existente en vez de crear otro
-                ptz.SetPreset(solicitud)
+                # actualiza el existente; si no hay, se pide ese numero de
+                # espacio para que "preset N" caiga siempre en el espacio N
+                solicitud.PresetToken = token_existente or str(self.numero)
+                try:
+                    ptz.SetPreset(solicitud)
+                except Exception:
+                    if token_existente:
+                        raise
+                    solicitud.PresetToken = None  # la marca no deja elegir el espacio
+                    ptz.SetPreset(solicitud)
                 self.resultado.emit(True, f"Posicion actual guardada como preset {self.numero}")
             else:
                 if not token_existente:
