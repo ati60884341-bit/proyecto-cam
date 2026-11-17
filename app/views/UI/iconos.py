@@ -57,6 +57,34 @@ def _turnos(pintor, r, color):
     pintor.drawLine(centro, QPointF(centro.x() + 3.2, centro.y() + 1.5))
 
 
+def _mapa(pintor, r, color):
+    """Plano plegado en tres + un punto de ubicacion."""
+    _pluma(pintor, color)
+    x0, x1, x2, x3 = r.left() + 2, r.left() + r.width() / 3, r.left() + 2 * r.width() / 3, r.right() - 2
+    arriba, abajo = r.top() + 4, r.bottom() - 4
+    pintor.drawPolyline(QPolygonF([
+        QPointF(x0, arriba + 2), QPointF(x1, arriba), QPointF(x2, arriba + 2), QPointF(x3, arriba),
+        QPointF(x3, abajo - 2), QPointF(x2, abajo), QPointF(x1, abajo - 2), QPointF(x0, abajo), QPointF(x0, arriba + 2),
+    ]))
+    pintor.drawLine(QPointF(x1, arriba), QPointF(x1, abajo - 2))
+    pintor.drawLine(QPointF(x2, arriba + 2), QPointF(x2, abajo))
+    pintor.setBrush(QColor(color))
+    pintor.drawEllipse(QPointF(x2, r.center().y()), 1.8, 1.8)
+
+
+def _busqueda(pintor, r, color):
+    """Lupa sobre una silueta de persona."""
+    _pluma(pintor, color)
+    centro = QPointF(r.left() + r.width() * 0.42, r.top() + r.height() * 0.42)
+    radio = r.width() * 0.3
+    pintor.drawEllipse(centro, radio, radio)
+    pintor.drawLine(QPointF(centro.x() + radio * 0.72, centro.y() + radio * 0.72),
+                    QPointF(r.right() - 2, r.bottom() - 2))
+    pintor.drawEllipse(QPointF(centro.x(), centro.y() - radio * 0.3), radio * 0.28, radio * 0.28)
+    pintor.drawArc(QRectF(centro.x() - radio * 0.55, centro.y() + radio * 0.05, radio * 1.1, radio * 1.0),
+                   0, 180 * 16)
+
+
 def _radar(pintor, r, color):
     _pluma(pintor, color)
     pintor.drawEllipse(r.adjusted(2, 2, -2, -2))
@@ -191,6 +219,8 @@ _DIBUJANTES = {
     "evidencias": _evidencias,
     "turnos": _turnos,
     "radar": _radar,
+    "mapa": _mapa,
+    "busqueda": _busqueda,
     "camaras": _camaras,
     "dvr": _dvr,
     "telegram": _telegram,

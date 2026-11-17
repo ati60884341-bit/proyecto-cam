@@ -28,6 +28,9 @@ datas += [
     ("app/recursos/imagenes/fondo_nocturno.png", "app/recursos/imagenes"),
     ("app/recursos/imagenes/fondo_nocturno.gif", "app/recursos/imagenes"),
     ("app/recursos/imagenes/icono_cam.ico", "app/recursos/imagenes"),
+    ("app/recursos/imagenes/plano_laboratorio.png", "app/recursos/imagenes"),
+    # red neuronal de la IA de personas (NanoDet, OpenCV Zoo, Apache 2.0) - ver ia_personas.py
+    ("app/recursos/modelos/nanodet.onnx", "app/recursos/modelos"),
 ]
 
 hiddenimports = [

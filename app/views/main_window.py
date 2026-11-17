@@ -12,6 +12,8 @@ from app.views.reportes_view import ReportesView
 from app.views.camaras_view import CamarasView
 from app.views.dvr_view import DvrView
 from app.views.radar_view import RadarView
+from app.views.mapa_view import MapaView
+from app.views.busqueda_view import BusquedaView
 from app.views.alertas_view import AlertasView
 from app.views.inicio_view import InicioView
 from app.views.manuales_view import ManualesView
@@ -87,6 +89,8 @@ class MainWindow(QMainWindow):
         for clave, texto in [
             ("inicio", "Inicio"),
             ("dashboard", "Centro de monitoreo"),
+            ("mapa", "Mapa del lugar"),
+            ("busqueda", "Busqueda de personas"),
             ("incidencias", "Incidencias"),
             ("evidencias", "Evidencias"),
             ("turnos", "Turnos"),
@@ -122,6 +126,8 @@ class MainWindow(QMainWindow):
         self.evidencias_view = EvidenciasView()
         self.turnos_view = TurnosView()
         self.radar_view = RadarView()
+        self.mapa_view = MapaView()
+        self.busqueda_view = BusquedaView()
         self.camaras_view = CamarasView()
         self.dvr_view = DvrView()
         self.alertas_view = AlertasView()
@@ -136,6 +142,8 @@ class MainWindow(QMainWindow):
             ("evidencias", self.evidencias_view),
             ("turnos", self.turnos_view),
             ("radar", self.radar_view),
+            ("mapa", self.mapa_view),
+            ("busqueda", self.busqueda_view),
             ("camaras", self.camaras_view),
             ("dvr", self.dvr_view),
             ("telegram", self.alertas_view),
@@ -164,6 +172,8 @@ class MainWindow(QMainWindow):
             "evidencias": self.evidencias_view,
             "turnos": self.turnos_view,
             "radar": self.radar_view,
+            "mapa": self.mapa_view,
+            "busqueda": self.busqueda_view,
             "camaras": self.camaras_view,
             "dvr": self.dvr_view,
             "telegram": self.alertas_view,

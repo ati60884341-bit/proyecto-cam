@@ -8,6 +8,8 @@ from app.controllers.reporte_controller import ReporteController
 from app.controllers.camara_controller import CamaraController
 from app.controllers.dvr_controller import DvrController
 from app.controllers.radar_controller import RadarController
+from app.controllers.mapa_controller import MapaController
+from app.controllers.busqueda_controller import BusquedaController
 from app.controllers.telegram_controller import TelegramController
 from app.controllers.alertas_controller import AlertasController
 from app.controllers.inicio_controller import InicioController
@@ -50,6 +52,8 @@ class AppController:
             self.main_window.radar_view, self.main_window.camaras_view, self.main_window.dvr_view,
             mostrar_seccion=self.main_window.mostrar_seccion,
         )
+        self.mapa_controller = MapaController(self.main_window.mapa_view, self.monitoreo_controller)
+        self.busqueda_controller = BusquedaController(self.main_window.busqueda_view, self.monitoreo_controller)
         self.telegram_controller = TelegramController(self.main_window.telegram_view)
         self.alertas_controller = AlertasController(self.main_window.alertas_view)
         self.inicio_controller = InicioController(

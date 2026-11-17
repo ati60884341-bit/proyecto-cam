@@ -19,6 +19,8 @@ import numpy as np
 from PySide6.QtCore import QThread, Signal
 
 from app.config import BUFFER_SEGUNDOS, CAPTURA_FPS, UMBRAL_SABOTAJE, EVIDENCIAS_DIR
+from app.services.mapa_service import MedidorMovimiento
+from app.services.ia_personas import dibujar as dibujar_personas
 
 TIMEOUT_CONEXION_RTSP_SEG = 4.0
 LECTURAS_FALLIDAS_PARA_RECONECTAR = 40  # ~2s de lecturas fallidas seguidas -> reconectar
@@ -255,6 +257,9 @@ class CamaraThread(QThread):
     frame_listo = Signal(object)          # numpy array BGR, para pintar en la UI
     estado_cambiado = Signal(str)         # "conectada" | "sin_senal" | "sabotaje" | "reconectando"
     sabotaje_detectado = Signal(str, str, str, bool)  # zona, ruta_video, ruta_foto, es_simulacro
+    cruce_linea = Signal(int, int, int)   # sentido (+1/-1), entradas, salidas (ver linea_virtual.py)
+    movimiento = Signal(float)            # 0..1 de la imagen en movimiento, ~2 por segundo (ver mapa_service.py)
+    personas_detectadas = Signal(object)  # lista de personas de la IA (ver ia_personas.analizar), ~4 por segundo
 
     def __init__(self, id_camara, zona, nombre_camara, tipo_conexion, url_conexion, parent=None):
         super().__init__(parent)
@@ -283,6 +288,18 @@ class CamaraThread(QThread):
         # las senales se encolaban sin limite cuando la UI iba mas lenta, el
         # video se atrasaba y los avisos de sabotaje (misma cola) llegaban tarde
         self._entrega_pendiente = False
+        # linea virtual (None = apagada). Se reemplaza desde la UI en caliente;
+        # asignar un atributo es atomico en Python, no hace falta candado
+        self.detector_linea = None
+        self._resaltar_hasta = 0.0
+        # IA de personas (None = apagada): corre en su propio hilo (AnalizadorIA),
+        # aca solo se le entrega el ultimo cuadro y se dibuja su ultimo resultado
+        self.ia = None
+        # movimiento para el Mapa del lugar: se manda el maximo de cada medio
+        # segundo (no cada cuadro) para no inundar la cola de senales de la UI
+        self._medidor = MedidorMovimiento()
+        self._mov_max = 0.0
+        self._mov_enviado = 0.0
 
     def confirmar_entrega(self):
         """La UI llama esto al terminar de pintar un frame de esta camara."""
@@ -290,6 +307,8 @@ class CamaraThread(QThread):
 
     def detener(self):
         self._activo = False
+        if self.ia is not None:
+            self.ia.detener()
 
     def forzar_reconexion(self):
         """Pide resincronizar con un fotograma clave nuevo (ej. justo despues
@@ -564,6 +583,24 @@ class CamaraThread(QThread):
             ok_jpg, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, CALIDAD_JPEG_BUFFER])
             if ok_jpg:
                 self._buffer.append(jpg)
+            # linea virtual DESPUES del buffer: evidencias y "maquina del
+            # tiempo" quedan con la imagen limpia, solo la pantalla la ve dibujada
+            if not self._en_sabotaje:  # tapar la camara no es "alguien caminando"
+                self._mov_max = max(self._mov_max, self._medidor.medir(frame))
+            if ahora - self._mov_enviado >= 0.5:
+                self._mov_enviado = ahora
+                self.movimiento.emit(self._mov_max)
+                self._mov_max = 0.0
+            ia = self.ia
+            if ia is not None:
+                ia.entregar(frame)
+                frame = dibujar_personas(frame, ia.personas, ia.zonas)
+            detector = self.detector_linea
+            if detector is not None:
+                for sentido in detector.procesar(frame):
+                    self._resaltar_hasta = ahora + 1.0
+                    self.cruce_linea.emit(sentido, detector.entradas, detector.salidas)
+                frame = detector.dibujar(frame, resaltar=ahora < self._resaltar_hasta)
             if not self._entrega_pendiente:
                 self._entrega_pendiente = True
                 self.frame_listo.emit(frame)

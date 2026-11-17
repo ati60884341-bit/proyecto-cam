@@ -1,3 +1,4 @@
+import json
 import os
 import threading
 import time
@@ -15,6 +16,9 @@ from app.services.voice_service import GrabacionVozThread, interpretar_comando, 
 from app.services.panic_service import DetectorPanicoThread
 from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread, _datos_conexion
 from app.services import alertas_service, alarma_service, imou_cloud
+from app.services.linea_virtual import DetectorLinea
+from app.services.ia_personas import AnalizadorIA, calcular_homografia
+from app.services import avistamientos
 from app.views.UI.zona_ampliada_dialog import ZonaAmpliadaDialog
 
 import cv2
@@ -115,6 +119,11 @@ class MonitoreoController:
         self.dialogos_ampliados = {}
         self._estados = {}  # clave -> ultimo estado (para el resumen de Inicio)
         self.factor_zoom = {}
+        # quienes quieren saber cuanto movimiento ve cada camara (ej. el Mapa
+        # del lugar): funciones (clave, nivel 0..1), ~2 veces por segundo
+        self.oyentes_movimiento = []
+        # idem con lo que ve la IA de personas: funciones (clave, [personas])
+        self.oyentes_personas = []
         # lista, no una sola variable: si se mueven dos camaras (zonas
         # distintas) casi al mismo tiempo, una sola variable pierde la
         # referencia a la primera mientras todavia esta corriendo (riesgo
@@ -328,6 +337,14 @@ class MonitoreoController:
         hilo.frame_listo.connect(lambda frame, z=zona: self._on_frame(z, frame))
         hilo.estado_cambiado.connect(lambda estado, z=zona: self._on_estado(z, estado))
         hilo.sabotaje_detectado.connect(self._on_sabotaje)
+        hilo.cruce_linea.connect(lambda s, e, sa, z=zona: self._on_cruce_linea(z, s, e, sa))
+        hilo.movimiento.connect(lambda nivel, z=zona: self._on_movimiento(z, nivel))
+        hilo.personas_detectadas.connect(lambda personas, z=zona: self._on_personas(z, personas))
+        linea = self._leer_linea(camara["IdCamara"])
+        if linea:
+            hilo.detector_linea = DetectorLinea(*linea)
+        if self._ajustes.value(f"ia/{camara['IdCamara']}", "") == "1":
+            self._encender_ia(hilo, camara["IdCamara"])
         self.hilos_camara[zona] = hilo
         hilo.start()
         if zona == self._clave_panico() and getattr(self, "detector_panico", None):
@@ -344,6 +361,9 @@ class MonitoreoController:
             hilo.frame_listo.disconnect()
             hilo.estado_cambiado.disconnect()
             hilo.sabotaje_detectado.disconnect()
+            hilo.cruce_linea.disconnect()
+            hilo.movimiento.disconnect()
+            hilo.personas_detectadas.disconnect()
         except TypeError:
             pass
         if hilo.wait(1500):
@@ -668,9 +688,185 @@ class MonitoreoController:
         dialogo = self.dialogos_ampliados.get(zona)
         if dialogo is None:
             dialogo = ZonaAmpliadaDialog(zona, self.view)
+            dialogo.linea_definida.connect(lambda p1, p2, z=zona: self._poner_linea(z, p1, p2))
+            dialogo.linea_quitada.connect(lambda z=zona: self._poner_linea(z, None, None))
+            dialogo.ia_alternada.connect(lambda activa, z=zona: self._alternar_ia(z, activa))
+            dialogo.zona_agregada.connect(lambda nombre, pts, z=zona: self._agregar_zona(z, nombre, pts))
+            dialogo.zonas_borradas.connect(lambda z=zona: self._guardar_zonas(z, []))
+            dialogo.calibracion_definida.connect(lambda cam, plano, z=zona: self._guardar_calibracion(z, cam, plano))
             self.dialogos_ampliados[zona] = dialogo
+        camara = self.camaras_por_zona.get(zona)
+        dialogo.set_tiene_linea(bool(camara and self._leer_linea(camara["IdCamara"])))
+        dialogo.ruta_plano = self._ajustes.value("mapa/plano", "") or ""
+        self._refrescar_dialogo_ia(zona)
         dialogo.show()
         dialogo.raise_()
+
+    # ---------------- IA de personas (ropa, zonas, plano) ----------------
+    # todo por camara en ESTA PC (QSettings): ia/<id> = "1", zonas_ia/<id> y
+    # calibracion/<id> en JSON. Los avistamientos van a evidencias/avistamientos
+    SEG_ENTRE_AVISTAMIENTOS = 4.0
+
+    def _leer_json(self, clave, defecto):
+        try:
+            return json.loads(self._ajustes.value(clave, "") or "null") or defecto
+        except ValueError:
+            return defecto
+
+    def _encender_ia(self, hilo, id_camara):
+        try:
+            analizador = AnalizadorIA(al_resultado=hilo.personas_detectadas.emit)
+        except Exception as e:   # sin modelo / OpenCV sin DNN: la camara sigue normal
+            self.view.registrar_evento(f"[IA] No se pudo iniciar la IA de personas: {e}")
+            return False
+        analizador.zonas = [(n, [tuple(p) for p in pts]) for n, pts in self._leer_json(f"zonas_ia/{id_camara}", [])]
+        calib = self._leer_json(f"calibracion/{id_camara}", None)
+        if calib:
+            analizador.homografia = calcular_homografia(calib["camara"], calib["plano"])
+        hilo.ia = analizador
+        return True
+
+    def _alternar_ia(self, zona, activa):
+        camara = self.camaras_por_zona.get(zona)
+        hilo = self.hilos_camara.get(zona)
+        if not camara:
+            return
+        self._ajustes.setValue(f"ia/{camara['IdCamara']}", "1" if activa else "0")
+        if hilo and activa and hilo.ia is None:
+            if self._encender_ia(hilo, camara["IdCamara"]):
+                self.view.registrar_evento(f"[IA] Deteccion de personas activa en {camara['Nombre']}.")
+        elif hilo and not activa and hilo.ia is not None:
+            ia, hilo.ia = hilo.ia, None
+            ia.detener()
+            self.view.registrar_evento(f"[IA] Deteccion de personas apagada en {camara['Nombre']}.")
+        self._refrescar_dialogo_ia(zona)
+
+    def _agregar_zona(self, zona, nombre, puntos):
+        camara = self.camaras_por_zona.get(zona)
+        if not camara:
+            return
+        zonas = self._leer_json(f"zonas_ia/{camara['IdCamara']}", [])
+        zonas = [z for z in zonas if z[0].lower() != nombre.lower()] + [[nombre, [list(p) for p in puntos]]]
+        self._guardar_zonas(zona, zonas)
+
+    def _guardar_zonas(self, zona, zonas):
+        camara = self.camaras_por_zona.get(zona)
+        if not camara:
+            return
+        self._ajustes.setValue(f"zonas_ia/{camara['IdCamara']}", json.dumps(zonas))
+        hilo = self.hilos_camara.get(zona)
+        if hilo and hilo.ia:
+            hilo.ia.zonas = [(n, [tuple(p) for p in pts]) for n, pts in zonas]
+        self.view.registrar_evento(f"[IA] {camara['Nombre']}: {len(zonas)} zona(s) con nombre.")
+        self._refrescar_dialogo_ia(zona)
+
+    def _guardar_calibracion(self, zona, puntos_camara, puntos_plano):
+        camara = self.camaras_por_zona.get(zona)
+        if not camara:
+            return
+        self._ajustes.setValue(f"calibracion/{camara['IdCamara']}",
+                               json.dumps({"camara": puntos_camara, "plano": puntos_plano}))
+        hilo = self.hilos_camara.get(zona)
+        if hilo and hilo.ia:
+            hilo.ia.homografia = calcular_homografia(puntos_camara, puntos_plano)
+        self.view.registrar_evento(f"[IA] {camara['Nombre']} calibrada con el plano del lugar.")
+        self._refrescar_dialogo_ia(zona)
+
+    def _refrescar_dialogo_ia(self, zona):
+        dialogo = self.dialogos_ampliados.get(zona)
+        camara = self.camaras_por_zona.get(zona)
+        if not dialogo or not camara:
+            return
+        id_cam = camara["IdCamara"]
+        dialogo.set_estado_ia(
+            self._ajustes.value(f"ia/{id_cam}", "") == "1",
+            len(self._leer_json(f"zonas_ia/{id_cam}", [])),
+            bool(self._leer_json(f"calibracion/{id_cam}", None)),
+        )
+
+    def _on_personas(self, zona, personas):
+        if zona in self._zonas_ocultas:
+            return
+        for oyente in self.oyentes_personas:
+            oyente(zona, personas)
+        if not personas:
+            return
+        ahora = time.time()
+        ultimos = self.__dict__.setdefault("_ultimo_avistamiento", {})
+        if ahora - ultimos.get(zona, 0.0) < self.SEG_ENTRE_AVISTAMIENTOS:
+            return   # la misma gente cuadro a cuadro: un registro cada tantos segundos
+        ultimos[zona] = ahora
+        nombre = self.camaras_por_zona.get(zona, {}).get("Nombre", zona)
+        # escribir JPGs al disco fuera del hilo de la UI
+        threading.Thread(target=avistamientos.registrar, args=(nombre, personas, ahora), daemon=True).start()
+
+    # ---------------- linea virtual (contador de cruces) ----------------
+    PAUSA_AVISO_VOZ_SEG = 4.0
+    _voz_ocupada = threading.Lock()
+
+    def _leer_linea(self, id_camara):
+        """(p1, p2) en 0..1 guardada en ESTA PC (QSettings, como las ocultas), o None."""
+        valor = self._ajustes.value(f"linea_virtual/{id_camara}", "")
+        try:
+            x1, y1, x2, y2 = (float(v) for v in str(valor).split(","))
+            return (x1, y1), (x2, y2)
+        except ValueError:
+            return None
+
+    def _poner_linea(self, zona, p1, p2):
+        camara = self.camaras_por_zona.get(zona)
+        if not camara:
+            return
+        clave = f"linea_virtual/{camara['IdCamara']}"
+        hilo = self.hilos_camara.get(zona)
+        if p1 is None:
+            self._ajustes.remove(clave)
+            if hilo:
+                hilo.detector_linea = None
+            self.view.registrar_evento(f"[LINEA] Linea virtual quitada en {zona}.")
+        else:
+            self._ajustes.setValue(clave, f"{p1[0]:.4f},{p1[1]:.4f},{p2[0]:.4f},{p2[1]:.4f}")
+            if hilo:
+                hilo.detector_linea = DetectorLinea(p1, p2)
+            self.view.registrar_evento(
+                f"[LINEA] Linea virtual activa en {zona}: se cuentan las personas que la cruzan."
+            )
+        dialogo = self.dialogos_ampliados.get(zona)
+        if dialogo:
+            dialogo.set_tiene_linea(p1 is not None)
+
+    def _on_movimiento(self, zona, nivel):
+        if zona in self._zonas_ocultas:
+            return
+        for oyente in self.oyentes_movimiento:
+            oyente(zona, nivel)
+
+    def _on_cruce_linea(self, zona, sentido, entradas, salidas):
+        if zona in self._zonas_ocultas:
+            return
+        camara = self.camaras_por_zona.get(zona, {})
+        nombre = camara.get("Nombre", zona)
+        verbo = "entrando" if sentido > 0 else "saliendo"
+        self.view.registrar_evento(
+            f"[LINEA] Persona {verbo} en {nombre} (entran {entradas} / salen {salidas})."
+        )
+        zf = self.view.zona_widget(zona)
+        if zf:
+            zf.estado_label.setText(f"Linea virtual: entran {entradas} | salen {salidas}")
+        ahora = time.time()
+        if ahora - getattr(self, "_ultimo_aviso_voz", 0.0) < self.PAUSA_AVISO_VOZ_SEG:
+            return  # varias personas seguidas: un aviso cada tantos segundos, no uno encima de otro
+        self._ultimo_aviso_voz = ahora
+
+        def avisar():
+            # pyttsx3 no tolera dos voces a la vez: si ya esta hablando, se salta
+            if self._voz_ocupada.acquire(blocking=False):
+                try:
+                    hablar(f"Atencion. Persona {verbo} en {nombre}.")
+                finally:
+                    self._voz_ocupada.release()
+
+        threading.Thread(target=avisar, daemon=True).start()
 
     # ---------------- comandos (voz / manual) ----------------
     def _procesar_comando_manual(self, texto):
