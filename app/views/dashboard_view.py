@@ -47,6 +47,20 @@ def html_manual_comandos(camaras, numeros_ptz):
             ("Moverla (solo con motor)", f"camara {p} mover izquierda / derecha / arriba / abajo"),
             ("Guardar esa posicion", f"camara {p} preset 1 guardar"),
             ("Volver a esa posicion", f"camara {p} preset 1"),
+            ("Fijar la posicion de inicio", f"camara {p} inicio guardar"),
+            ("Volver al inicio", f"camara {p} inicio"),
+            ("Volver al centro real (Imou)", f"camara {p} centrar"),
+            ("Seguir a la persona (Imou)", f"camara {p} seguir / dejar de seguir"),
+            ("Patrullar sola (Imou)", f"camara {p} ronda / parar ronda"),
+            ("Sirena (Imou)", f"camara {p} sirena / apagar sirena"),
+            ("Luz (Imou)", f"camara {p} luz / apagar luz"),
+            ("Privacidad (Imou)", f"camara {p} privacidad / quitar privacidad"),
+            ("Vision nocturna (Imou)", f"camara {p} vision a color / infrarroja / inteligente / apagar vision"),
+            ("Contraluz (Imou)", f"camara {p} contraluz / quitar contraluz"),
+            ("Voltear imagen (Imou)", f"camara {p} voltear imagen / quitar voltear imagen"),
+            ("Recuadro en personas (Imou)", f"camara {p} marcar personas / quitar recuadro"),
+            ("Microfono de la camara (Imou)", f"camara {p} encender / apagar microfono"),
+            ("Luz indicadora (Imou)", f"camara {p} luz indicadora / apagar luz indicadora"),
         ]
     filas_acciones = "".join(f"<tr><td>{quiero}</td><td class='di'>{digo}</td></tr>" for quiero, digo in acciones)
     con_motor = (

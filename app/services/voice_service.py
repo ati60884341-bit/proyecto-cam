@@ -67,6 +67,8 @@ def buscar_camara(texto, camaras):
     return puntajes[0][1]
 
 
+PRESET_INICIO = 8
+
 DIRECCIONES_PTZ = {
     "izquierda": "izquierda", "a la izquierda": "izquierda",
     "derecha": "derecha", "a la derecha": "derecha",
@@ -96,6 +98,45 @@ def interpretar_comando(texto, camaras=()):
         if re.search(r"guarda|grabar|memoriza|fija", texto_normalizado):
             return "preset_guardar", zona_encontrada, texto, numero_preset
         return "preset_ir", zona_encontrada, texto, numero_preset
+
+    # funciones de la nube Imou (ver imou_cloud.py) y volver al centro: van
+    # antes del zoom porque "autozoom" contiene "zoom"
+    t = f" {texto_normalizado} "
+    apagar = re.search(r"apaga|quita|desactiva|para |parar|deten|sin |normal", t)
+    if re.search(r"vision|nocturn", t):
+        if re.search(r"color", t):
+            return "vision_color", zona_encontrada, texto, None
+        if re.search(r"infrarroj| ir |blanco y negro", t):
+            return "vision_ir", zona_encontrada, texto, None
+        return ("vision_off" if apagar else "vision_auto"), zona_encontrada, texto, None
+    if re.search(r"contraluz|wdr|rango dinamico", t):
+        return ("wdr_off" if apagar else "wdr_on"), zona_encontrada, texto, None
+    if re.search(r"luz indicadora|indicador|led", t):
+        return ("indicador_off" if apagar else "indicador_on"), zona_encontrada, texto, None
+    if re.search(r"microfono|audio", t):
+        return ("mic_off" if apagar else "mic_on"), zona_encontrada, texto, None
+    if re.search(r"(voltea|invierte|gira)r? (la )?imagen|imagen (volteada|invertida)", t):
+        return ("voltear_off" if apagar else "voltear_on"), zona_encontrada, texto, None
+    if re.search(r"marca|recuadro", t) and re.search(r"persona|movimiento|recuadro", t):
+        return ("marcar_off" if apagar else "marcar_on"), zona_encontrada, texto, None
+    if re.search(r"ronda|patrulla|vigila sola", t):
+        return ("ronda_off" if apagar else "ronda_on"), zona_encontrada, texto, None
+    if re.search(r" (centrar|centra|centro|calibra|calibrar) ", t):
+        return "centrar", zona_encontrada, texto, None
+    if " sirena " in t:
+        return ("sirena_off" if re.search(r"apaga|para|deten|silencia|quita|calla", t) else "sirena_on"), zona_encontrada, texto, None
+    if re.search(r" (luz|foco|linterna) ", t):
+        return ("luz_off" if re.search(r"apaga|quita", t) else "luz_on"), zona_encontrada, texto, None
+    if re.search(r"privacidad|tapar lente|cerrar camara", t):
+        return ("privacidad_off" if re.search(r"quita|desactiva|sin privacidad|apaga", t) else "privacidad_on"), zona_encontrada, texto, None
+    if re.search(r"segui|rastrea|auto ?zoom", t):
+        return ("seguir_off" if re.search(r"deja|para|deten|no segui|quita|desactiva|apaga", t) else "seguir_on"), zona_encontrada, texto, None
+    if re.search(r" (inicio|posicion inicial) ", t):
+        # la Cruiser no tiene "home" ONVIF ni AbsoluteMove: "inicio" es el
+        # preset 8 (el ultimo de los 8 que guarda), que el usuario fija una vez
+        if re.search(r"guarda|grabar|memoriza|fija", t):
+            return "preset_guardar", zona_encontrada, texto, PRESET_INICIO
+        return "preset_ir", zona_encontrada, texto, PRESET_INICIO
 
     if re.search(r"mover|gira|girar|voltear|rota|rotar|apunta|apuntar", texto_normalizado):
         direccion = next((d for clave, d in DIRECCIONES_PTZ.items() if clave in texto_normalizado), None)

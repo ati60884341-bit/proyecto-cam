@@ -13,8 +13,8 @@ from app.services.hash_service import firmar_archivo
 from app.services.fatiga_service import AuditorFatiga
 from app.services.voice_service import GrabacionVozThread, interpretar_comando, hablar
 from app.services.panic_service import DetectorPanicoThread
-from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread
-from app.services import alertas_service, alarma_service
+from app.services.ptz_service import MovimientoPTZThread, PresetPTZThread, _datos_conexion
+from app.services import alertas_service, alarma_service, imou_cloud
 from app.views.UI.zona_ampliada_dialog import ZonaAmpliadaDialog
 
 import cv2
@@ -731,6 +731,8 @@ class MonitoreoController:
         if accion.startswith("mover_"):
             direccion = accion.split("_", 1)[1]
             return self._mover_camara(zona_nombre, direccion)
+        if accion in imou_cloud.ACCIONES:
+            return self._accion_nube_imou(zona_nombre, accion)
         if accion in ("preset_guardar", "preset_ir"):
             if numero_preset is None:
                 return "Indique el numero de preset (ej. \"patio preset 1\")"
@@ -779,6 +781,26 @@ class MonitoreoController:
         hilo.start()
         verbo = "Guardando posicion como" if accion_preset == "guardar" else "Yendo al"
         return f"{verbo} preset {numero_preset} en {zona}..."
+
+    def _accion_nube_imou(self, zona, accion):
+        """Sirena / luz / privacidad / seguimiento: solo por la nube Imou
+        (la camara no los expone por ONVIF local, ver imou_cloud.py)."""
+        camara = self.camaras_por_zona.get(zona)
+        if not camara:
+            return "Indique la camara, por ejemplo: imou sirena"
+        if camara["TipoConexion"] != "RTSP" or camara["Marca"] != "Dahua":
+            return f"La camara de {zona} no es Imou/Dahua: esa funcion no esta disponible"
+        if not imou_cloud.configurada():
+            return "Falta configurar la nube Imou (CAM_IMOU_APP_ID y CAM_IMOU_APP_SECRET)"
+
+        host, puerto, usuario, clave = _datos_conexion(camara["UrlConexion"], camara["Marca"])
+        hilo = imou_cloud.ImouCloudThread(accion, host, puerto, usuario, clave)
+        hilo.resultado.connect(lambda ok, mensaje: self.view.registrar_evento(f"{'[IMOU]' if ok else '[IMOU-ERROR]'} {mensaje}"))
+        hilo.finished.connect(lambda h=hilo: self._hilos_ptz_activos.remove(h))
+        hilo.finished.connect(hilo.deleteLater)
+        self._hilos_ptz_activos.append(hilo)  # evita que se recolecte mientras corre
+        hilo.start()
+        return f"{imou_cloud.DESCRIPCION[accion]} en {zona} (enviando a la nube Imou)..."
 
     def _on_resultado_ptz(self, ok, mensaje, zona):
         self.view.registrar_evento(f"{'[PTZ]' if ok else '[PTZ-ERROR]'} {mensaje}")

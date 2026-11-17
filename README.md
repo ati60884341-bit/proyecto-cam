@@ -256,6 +256,19 @@ del driver de audio + hilos de camara activos); mientras tanto se muestra
 | Mover la camara (PTZ real) | "`<zona>` mover izquierda / derecha / arriba / abajo" / "`<zona>` girar izquierda" |
 | Guardar posicion PTZ (preset 1-9) | "`<zona>` preset N guardar" / "`<zona>` preset N grabar" / "`<zona>` preset N memoriza" |
 | Ir a una posicion PTZ guardada | "`<zona>` preset N" (sin verbo) |
+| Fijar / volver a la posicion de inicio (es el preset 8) | "`<zona>` inicio guardar" / "`<zona>` inicio" |
+| Volver al centro real / calibrar (Imou, nube) | "`<zona>` centrar" / "`<zona>` calibrar" |
+| Seguimiento automatico (Imou, nube) | "`<zona>` seguir" / "`<zona>` autozoom" / "`<zona>` dejar de seguir" |
+| Ronda automatica (Imou, nube) | "`<zona>` ronda" / "`<zona>` patrullar" / "`<zona>` parar ronda" |
+| Sirena (Imou, nube) | "`<zona>` sirena" / "`<zona>` apagar sirena" |
+| Luz (Imou, nube) | "`<zona>` luz" / "`<zona>` apagar luz" |
+| Modo privacidad (Imou, nube) | "`<zona>` privacidad" / "`<zona>` quitar privacidad" |
+| Vision nocturna (Imou, nube) | "`<zona>` vision a color" / "`<zona>` vision infrarroja" / "`<zona>` vision inteligente" / "`<zona>` apagar vision nocturna" |
+| Contraluz / WDR (Imou, nube) | "`<zona>` contraluz" / "`<zona>` quitar contraluz" |
+| Voltear imagen (Imou, nube) | "`<zona>` voltear imagen" / "`<zona>` quitar voltear imagen" |
+| Recuadro sobre personas (Imou, nube) | "`<zona>` marcar personas" / "`<zona>` quitar recuadro" |
+| Microfono de la camara (Imou, nube) | "`<zona>` encender microfono" / "`<zona>` apagar microfono" |
+| Luz indicadora (Imou, nube) | "`<zona>` luz indicadora" / "`<zona>` apagar luz indicadora" |
 | Vista general | "vista general" (no necesita zona) |
 
 Ejemplos: *"patio ampliar"*, *"ingreso capturar"*, *"estacionamiento acercar"*,
@@ -270,6 +283,25 @@ puerto/credenciales no son correctos, el sistema lo informa en la bitacora
 de eventos sin interrumpir el resto de la app. Los presets quedan grabados
 **en la propia camara** (no en esta base de datos): un preset guardado con
 una marca/modelo PTZ puede no ser compatible con otra.
+
+**Camaras Imou (ej. Cruiser IPC-K7F):** se agregan como marca **Dahua**,
+RTSP, usuario `admin` y como clave el *codigo de seguridad* de la etiqueta.
+Girar y presets van por ONVIF local (puerto 80; guarda 8 presets, y el 8 es
+el "inicio"). **Sirena, luz, privacidad, seguimiento, ronda, centrar,
+vision nocturna, contraluz, voltear, recuadro de personas, microfono y luz
+indicadora** (todas confirmadas con `device.capability.list` en la IPC-K7F)
+esta camara no los expone en la red local, asi que van por la nube oficial de Imou
+(`app/services/imou_cloud.py`): requieren internet y una aplicacion en
+<https://open.imoulife.com> creada con la misma cuenta de la app Imou.
+Defina antes de abrir el programa:
+
+```bash
+setx CAM_IMOU_APP_ID "su_app_id"
+setx CAM_IMOU_APP_SECRET "su_app_secret"
+```
+
+(opcional `CAM_IMOU_REGION` = `sg` / `eu` / `na`; si falta se prueban las
+tres). La nube da 30.000 llamadas gratis al mes; cada comando usa 1-2.
 
 **Importante — el PTZ se declara por CAMARA, no por marca.** Al agregar una
 camara (pestana "Camaras") o un grabador (pestana "NVR / DVR") hay una
